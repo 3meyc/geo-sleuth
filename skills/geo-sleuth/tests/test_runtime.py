@@ -289,6 +289,22 @@ class OverpassMirrorTests(unittest.TestCase):
         for code in ("406", "500", "504"):
             self.assertIn(code, str(cm.exception))
 
+    def test_unreachable_mirror_is_not_retried_in_later_rounds(self):
+        e0, e1, e2 = osm.ENDPOINTS
+        replies = {e0: (None, "HTTP 504: server too busy"), e1: (None, "curl exit 7"), e2: (None, "curl exit 28")}
+        calls = []
+
+        def post(ep, q, proxy, timeout):
+            calls.append(ep)
+            return replies[ep]
+
+        with tempfile.TemporaryDirectory() as d, patch.object(osm, "_post", side_effect=post), \
+                patch.object(osm.time, "sleep"), self.assertRaises(SystemExit) as cm:
+            osm.run(QH, None, Path(d))
+        self.assertEqual(calls, [e0, e1, e2, e0, e0])             # busy mirror retried each round, dead ones once
+        for reason in ("504", "curl exit 7", "curl exit 28"):
+            self.assertIn(reason, str(cm.exception))
+
     def test_error_remark_not_cached(self):
         def replies(ep, q):
             if ep == osm.ENDPOINTS[0]:
@@ -1159,6 +1175,43 @@ class OrientationTests(unittest.TestCase):
             self.assertEqual("stored frame" in err.getvalue(), warn, f"{name}: {err.getvalue()}")
 
 
+class TilesMarkTests(unittest.TestCase):
+    """tiles.py mark draws every GeoJSON geometry type osm.py geom emits, points included."""
+
+    def test_points_mixed_with_lines_and_polygons_are_drawn(self):
+        import geo
+        import tiles
+
+        z, lat, lon = 18, 50.4510, 30.4896
+        cx, cy = geo.ll2px(z, lat, lon)
+        origin = [int(cx // 256) - 1, int(cy // 256) - 1]
+        d = 0.0004
+        features = [
+            {"type": "Point", "coordinates": [lon, lat]},
+            {"type": "MultiPoint", "coordinates": [[lon + d, lat], [lon - d, lat]]},
+            {"type": "LineString", "coordinates": [[lon - d, lat + d], [lon + d, lat + d]]},
+            {"type": "Polygon", "coordinates": [[[lon - d, lat - d], [lon + d, lat - d], [lon, lat - 2 * d], [lon - d, lat - d]]]},
+            {"type": "MultiPolygon", "coordinates": [[[[lon, lat], [lon + d, lat], [lon, lat + d], [lon, lat]]]]},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            mosaic = Path(tmp, "m.jpg")
+            Image.new("RGB", (768, 768), "black").save(mosaic)
+            mosaic.with_suffix(".json").write_text(json.dumps({"zoom": z, "origin_tile": origin}), encoding="utf-8")
+            gj = Path(tmp, "f.geojson")
+            gj.write_text(json.dumps({"type": "FeatureCollection", "features": [
+                {"type": "Feature", "properties": {}, "geometry": g} for g in features]}), encoding="utf-8")
+            out = Path(tmp, "out.png")
+            with contextlib.redirect_stdout(io.StringIO()) as log:
+                tiles.mark(mosaic, {}, out, False, geojsons=[gj])
+            img = Image.open(out).convert("RGB")
+            m = tiles.Mosaic(mosaic)
+
+            self.assertIn("5 features", log.getvalue())
+            for plon in (lon + d, lon - d):  # each MultiPoint member gets its own square marker
+                x, y = m.to_px(lat, plon)
+                self.assertEqual(img.getpixel((round(x) - 3, round(y))), (255, 165, 0))
+
+
 class WorkingCopyTests(unittest.TestCase):
     """Stage 3 of #29: a lossless upright PNG only for photos that need one, original EXIF kept, uploads compatible."""
 
@@ -1210,15 +1263,47 @@ class WorkingCopyTests(unittest.TestCase):
         with self.assertRaises(_image.ImageReadError):
             _image.write_working_copy(self.d / "IMG.CR2", self.d / "w" / "IMG.png")
 
-    def test_revimg_uploads_a_compatible_copy_only_when_needed(self):
+    def _gps_exif(self, o):
+        ex = self._exif(o)
+        ex[0x8825] = {1: "N", 2: (50.0, 27.0, 3.6), 3: "E", 4: (30.0, 29.0, 22.6)}    # GPSInfo: Kyiv
+        ex[0x010F] = "Apple"                                                       # Make
+        return ex
+
+    def _assert_no_metadata(self, path):
+        raw = path.read_bytes()
+        for marker in (b"Exif\x00\x00", b"http://ns.adobe.com/xap/", b"secret-comment", b"TRAILING-MPF-IMAGE"):
+            self.assertNotIn(marker, raw, f"{path.name} still carries {marker!r}")
+        with Image.open(path) as im:
+            self.assertEqual(dict(im.getexif()), {}, path.name)
+            self.assertFalse({k for k in im.info if k in ("comment", "exif", "xmp", "Comment", "Description")}, path.name)
+
+    def test_revimg_uploads_carry_no_metadata(self):
         import revimg
-        self.control.save(self.d / "plain.jpg")
-        stored_as(self.control, 8).save(self.d / "side.jpg", exif=self._exif(8))
-        self.assertEqual(revimg._upload_path(self.d / "plain.jpg", self.d / "rev"), self.d / "plain.jpg")
-        up = revimg._upload_path(self.d / "side.jpg", self.d / "rev")
-        self.assertEqual(up, self.d / "rev" / "upload" / "side.png")
-        with Image.open(up) as im:
-            self.assertEqual(im.size, (60, 40))
+        jpeg = self.d / "plain.jpg"
+        self.control.save(jpeg, exif=self._gps_exif(1), quality=92, comment=b"secret-comment",
+                          xmp=b"<x:xmpmeta xmlns:x='adobe:ns:meta/'><rdf:RDF xmlns:rdf='http://ns.adobe.com/xap/'/></x:xmpmeta>")
+        with jpeg.open("ab") as f:                                       # a secondary image appended after EOI, as phones do
+            f.write(b"\xff\xd8TRAILING-MPF-IMAGE\xff\xd9")
+        png = self.d / "plain.png"
+        info = __import__("PIL.PngImagePlugin", fromlist=["PngInfo"]).PngInfo()
+        info.add_text("Comment", "secret-comment")
+        self.control.save(png, exif=self._gps_exif(1), pnginfo=info)
+        stored_as(self.control, 8).save(self.d / "side.jpg", exif=self._gps_exif(8))
+        originals = {p: p.read_bytes() for p in (jpeg, png, self.d / "side.jpg")}
+
+        up_jpeg = revimg._upload_path(jpeg, self.d / "rev")
+        up_png = revimg._upload_path(png, self.d / "rev")
+        up_side = revimg._upload_path(self.d / "side.jpg", self.d / "rev")
+
+        self.assertEqual((up_jpeg, up_png, up_side), (self.d / "rev" / "upload" / "plain.jpg",
+                                                     self.d / "rev" / "upload" / "plain.png",
+                                                     self.d / "rev" / "upload" / "side.png"))
+        for p, before in originals.items():
+            self.assertEqual(p.read_bytes(), before, f"{p.name} was modified")
+        for up, src in ((up_jpeg, jpeg), (up_png, png), (up_side, self.d / "side.jpg")):
+            self._assert_no_metadata(up)
+            with Image.open(up) as im:                                     # same upright pixels, nothing re-encoded
+                self.assertEqual(im.convert("RGB").tobytes(), _image.open_photo(src).convert("RGB").tobytes(), up.name)
 
 
 class RevimgInputTests(unittest.TestCase):
@@ -1292,7 +1377,7 @@ class RevimgInputTests(unittest.TestCase):
         for eng, calls in sent.items():
             self.assertEqual([c for _, c in calls], list(images.values()), eng)
             self.assertEqual(len({p for p, _ in calls}), len(images), f"{eng}: two inputs shared one upload file")
-        self.assertEqual(sent["baidu"][2][0], self.d / "c" / "photo.jpg")
+        self.assertEqual(sent["baidu"][2][0], self.out / "upload" / "03_photo.jpg")   # a metadata-free copy, never the original
         records = [json.loads(f.read_text(encoding="utf-8")) for f in sorted(self.out.glob("*.json"))]
         self.assertEqual(len(records), len(images))
         for r in results + records:                                 # each record names the original whose pixels went out
@@ -1319,7 +1404,7 @@ class RevimgInputTests(unittest.TestCase):
         self.assertIn("2 of 3 images could not be read and were not uploaded", err)
         self.assertIn(f"{raw} (camera RAW", err)
         self.assertIn(f"{page} (text, not an image", err)
-        self.assertEqual([p for p, _ in sent["baidu"]], [good])
+        self.assertEqual([p for p, _ in sent["baidu"]], [self.out / "upload" / "good.jpg"])
 
     def test_cli_skips_removed_and_not_integrated_engines(self):
         good = self._solid("red", self.d / "good.jpg")
@@ -1328,7 +1413,7 @@ class RevimgInputTests(unittest.TestCase):
         self.assertIn("unknown engine 'yandex'", err)
         self.assertIn("google_lens is not integrated", err)
         self.assertIn("tineye is not integrated", err)
-        self.assertEqual([p for p, _ in sent["baidu"]], [good])
+        self.assertEqual([p for p, _ in sent["baidu"]], [self.out / "upload" / "good.jpg"])
 
     def test_cli_with_only_unreadable_inputs_starts_no_browser(self):
         raw, page = self._unreadable()

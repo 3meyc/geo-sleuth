@@ -106,26 +106,39 @@ PALETTE = ["yellow", "cyan", "magenta", "lime", "orange", "white", "red", "deeps
 LINE_COLORS = ["orange", "deepskyblue", "magenta", "lime", "white", "red"]
 
 
+def _geometry_parts(t: str | None, cs: list) -> tuple[list, list] | None:
+    """(lines, points) of one GeoJSON geometry; None for a type this module does not draw."""
+    if t == "Point":
+        return [], [cs]
+    if t == "MultiPoint":
+        return [], cs
+    if t == "LineString":
+        return [cs], []
+    if t in ("MultiLineString", "Polygon"):
+        return cs, []
+    if t == "MultiPolygon":
+        return [ring for poly in cs for ring in poly], []
+    return None
+
+
 def _draw_geojson(d: ImageDraw.ImageDraw, m: "Mosaic", gj: dict, color: str) -> int:
     """Draw GeoJSON lines, polygons and points on the mosaic (line width 3, polygons as outlines only). Returns how many features were drawn."""
     n = 0
     for ft in gj.get("features", []):
         g = ft.get("geometry") or {}
-        t, cs = g.get("type"), g.get("coordinates")
-        if not cs:
+        cs = g.get("coordinates")
+        parts = _geometry_parts(g.get("type"), cs) if cs else None
+        if parts is None:
             continue
-        lines = {"LineString": [cs], "MultiLineString": cs, "Polygon": cs,
-                 "MultiPolygon": [ring for poly in cs for ring in poly]}.get(t)
-        if lines is not None:
-            for ln in lines:
-                xy = [m.to_px(c[1], c[0]) for c in ln]
-                if len(xy) >= 2:
-                    d.line(xy, fill=color, width=3)
-            n += 1
-        elif t == "Point":
-            x, y = m.to_px(cs[1], cs[0])
+        lines, points = parts
+        for ln in lines:
+            xy = [m.to_px(c[1], c[0]) for c in ln]
+            if len(xy) >= 2:
+                d.line(xy, fill=color, width=3)
+        for c in points:
+            x, y = m.to_px(c[1], c[0])
             d.rectangle([x - 3, y - 3, x + 3, y + 3], outline=color, width=2)
-            n += 1
+        n += 1
     return n
 
 

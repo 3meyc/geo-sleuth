@@ -64,6 +64,11 @@ ENDPOINTS = [
 ]
 # overpass-api.de rejects curl's default User-Agent with HTTP 406; public instances ask clients to identify themselves
 UA = "geo-sleuth (+https://github.com/Oldcircle/geo-sleuth)"
+# A mirror that doesn't accept a connection fails fast instead of after the whole query timeout
+CONNECT_TIMEOUT_S = 10
+# curl exits meaning the mirror is unreachable or never answered (resolve, connect, timeout): a later round won't
+# fare better, so the mirror is skipped for the rest of the run. Busy replies (HTTP 429/504) are retried.
+UNREACHABLE = {"curl exit 6", "curl exit 7", "curl exit 28"}
 
 
 AREA_SET = re.compile(r"(\((?:area\[[^;]*\];)+\))->\.(\w+);")
@@ -71,7 +76,8 @@ AREA_SET = re.compile(r"(\((?:area\[[^;]*\];)+\))->\.(\w+);")
 
 def _post(ep: str, ql: str, proxy: str | None, timeout: int) -> tuple[dict | None, str]:
     """(reply, "") or (None, "HTTP 504: <what the server said>")."""
-    cmd = ["curl", "-q", "-s", "-m", str(timeout + 30), "-A", UA, "-w", "\n%{http_code}", "--data-urlencode", f"data={ql}", ep]
+    cmd = ["curl", "-q", "-s", "--connect-timeout", str(CONNECT_TIMEOUT_S), "-m", str(timeout + 30), "-A", UA,
+           "-w", "\n%{http_code}", "--data-urlencode", f"data={ql}", ep]
     cmd += curl_args(proxy)
     r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     body, _, code = (r.stdout or "").rpartition("\n")
@@ -113,7 +119,7 @@ def run(ql: str, proxy: str | None, cache: Path, timeout: int = 180, rounds: int
     empty_from = None
     for rnd in range(rounds):
         for ep in ENDPOINTS:
-            if ep == empty_from:
+            if ep == empty_from or errs.get(ep) in UNREACHABLE:
                 continue
             data, err = _post(ep, ql, proxy, timeout)
             if data is None:

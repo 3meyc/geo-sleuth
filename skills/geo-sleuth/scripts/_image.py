@@ -239,14 +239,75 @@ def write_working_copy(path: Path | str, out: Path | str) -> dict | None:
     why = working_copy_reason(im)
     if why is None:
         return None
-    up = upright(im)
-    if up.mode not in ("RGB", "RGBA", "L", "LA"):
-        up = up.convert("RGBA" if "A" in up.getbands() else "RGB")
-    exif = im.getexif()
-    if ORIENTATION in exif:
-        exif[ORIENTATION] = 1
-    out.parent.mkdir(parents=True, exist_ok=True)
-    extra = {"icc_profile": im.info["icc_profile"]} if im.info.get("icc_profile") else {}
-    up.save(out, format="PNG", exif=exif, **extra)
+    up = _save_upright_png(im, out, exif=im.getexif())
     return {"original": str(path), "working": str(out), "reason": why, "format": im.format,
             "original_size": list(im.size), "working_size": list(up.size)}
+
+
+def _save_upright_png(im: Image.Image, out: Path, *, exif: Image.Exif | None) -> Image.Image:
+    """Write the upright pixels losslessly as PNG, with the given EXIF (None writes none; its orientation tag is
+    reset to 1) and the ICC profile."""
+    up = upright(im)                            # before the reset below: getexif() returns the image's own Exif
+    if exif is not None and ORIENTATION in exif:
+        exif[ORIENTATION] = 1
+    if up.mode not in ("RGB", "RGBA", "L", "LA"):
+        up = up.convert("RGBA" if "A" in up.getbands() else "RGB")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    extra = {"icc_profile": im.info["icc_profile"]} if im.info.get("icc_profile") else {}
+    if exif is not None:
+        extra["exif"] = exif
+    up.save(out, format="PNG", **extra)
+    return up
+
+
+# JPEG segments that carry metadata, not pixels: APP1 (EXIF with GPS, XMP), APP13 (IPTC), COM (comments).
+# APP2 is kept for the ICC profile but dropped when it is an MPF index of images appended after the main one.
+_JPEG_METADATA_MARKERS = {0xE1, 0xED, 0xFE}
+
+
+def _strip_jpeg_metadata(data: bytes) -> bytes:
+    """The JPEG with its metadata segments and anything after the main image's EOI removed; the compressed
+    pixel data is copied byte for byte, so nothing is re-encoded. Raises ValueError for a malformed stream."""
+    if data[:2] != b"\xff\xd8":
+        raise ValueError("not a JPEG stream")
+    out, i = bytearray(data[:2]), 2
+    while i + 4 <= len(data):
+        if data[i] != 0xFF:
+            raise ValueError(f"bad JPEG marker at byte {i}")
+        marker = data[i + 1]
+        if marker == 0xFF:                      # fill byte before a marker
+            i += 1
+            continue
+        if marker == 0xDA:                      # start of scan: entropy data up to the main image's EOI
+            end = data.find(b"\xff\xd9", i)
+            if end < 0:
+                raise ValueError("JPEG stream has no end marker")
+            out += data[i:end + 2]
+            return bytes(out)
+        seg_end = i + 2 + int.from_bytes(data[i + 2:i + 4], "big")
+        segment = data[i:seg_end]
+        is_mpf_index = marker == 0xE2 and segment[4:8] == b"MPF\x00"
+        if marker not in _JPEG_METADATA_MARKERS and not is_mpf_index:
+            out += segment
+        i = seg_end
+    raise ValueError("JPEG stream ends before its image data")
+
+
+def write_upload_copy(path: Path | str, out_stem: Path | str) -> Path:
+    """A copy of a photo for third-party upload that carries no metadata (EXIF with GPS and camera, XMP, IPTC,
+    comments, appended secondary images) and shows the same upright pixels: a JPEG keeps its compressed data
+    byte for byte as <out_stem>.jpg, anything else becomes a lossless PNG <out_stem>.png. Raises ImageReadError
+    for unreadable photos; the original file is never touched."""
+    path, out_stem = Path(path), Path(out_stem)
+    im = open_image(path)
+    if working_copy_reason(im) is None and im.format in ("JPEG", "MPO"):
+        out = out_stem.parent / f"{out_stem.name}.jpg"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            out.write_bytes(_strip_jpeg_metadata(path.read_bytes()))
+            return out
+        except ValueError:                      # unusual stream layout: fall back to the lossless PNG below
+            out.unlink(missing_ok=True)
+    out = out_stem.parent / f"{out_stem.name}.png"
+    _save_upright_png(im, out, exif=None)
+    return out

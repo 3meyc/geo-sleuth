@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import argparse
 from _browser import launch_browser
-from _image import ImageReadError, open_image, upright, write_working_copy
+from _image import ImageReadError, open_image, upright, write_upload_copy
 from _net import fetch_bytes, PROXY_HELP
 import asyncio
 import io
@@ -241,11 +241,11 @@ def _names(images: list[Path]) -> list[str]:
 
 
 def _upload_path(img: Path, out_dir: Path, name: str | None = None) -> Path:
-    """Search engines take JPEG and PNG as stored. A HEIC, WebP, ... or a photo with an EXIF orientation still to
-    apply is uploaded as an upright lossless PNG copy, out_dir/upload/<name>.png; everything else as it is.
+    """Every upload is a metadata-free copy in out_dir/upload/: no EXIF (GPS, camera, time), XMP, IPTC or comments
+    leave the machine. A JPEG keeps its compressed pixels byte for byte (<name>.jpg); a HEIC, WebP, ... or a photo
+    with an EXIF orientation still to apply becomes an upright lossless PNG (<name>.png).
     Raises ImageReadError for a file the shared loader rejects: it is never uploaded."""
-    info = write_working_copy(img, out_dir / "upload" / f"{name or img.stem}.png")
-    return Path(info["working"]) if info else img
+    return write_upload_copy(img, out_dir / "upload" / (name or img.stem))
 
 
 async def run(images: list[Path], engines: list[str], out_dir: Path, proxy: str | None,
