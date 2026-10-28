@@ -1,0 +1,157 @@
+{
+ "_meta": {
+  "kind": "area-code",
+  "normalize": {
+   "digits_only": true,
+   "ensure_prefix": "0"
+  },
+  "key_pattern": "^0\\d{2}(?=(?:\\d{7})?$)",
+  "usage": "a full landline number in national form (048 123 45 67, (04849) 2-34-56, 0442345678) or the bare zone code (048); drop a leading +380 or +38 first",
+  "note": "One zone code per oblast (plus Kyiv, Sevastopol and Crimea). Longer local codes such as 04849 start with the zone code and resolve to the oblast; town-level codes are not in the table (no official list).",
+  "miss_note": "not a geographic zone: mobile network codes (050, 063, 066, 067, 068, 073–079, 081–085, 091–099), 0800/0808/0900 service numbers, 086x/089x non-geographic fixed, 087x M2M/IoT, 049x satellite, 039 ported number; or an international prefix left in (+380)",
+  "source": [
+   "https://zakon.rada.gov.ua/laws/show/z1534-23 (National Numbering Plan of Ukraine, order 758 of 26.08.2023, Annex 1; in force)"
+  ],
+  "fetched": "2026-10-28",
+  "license": "Official text of Ukraine (not subject to copyright, Copyright Act art. 10)",
+  "count": 27
+ },
+ "entries": {
+  "031": [
+   {
+    "admin1": "Закарпатська область"
+   }
+  ],
+  "032": [
+   {
+    "admin1": "Львівська область"
+   }
+  ],
+  "033": [
+   {
+    "admin1": "Волинська область"
+   }
+  ],
+  "034": [
+   {
+    "admin1": "Івано-Франківська область"
+   }
+  ],
+  "035": [
+   {
+    "admin1": "Тернопільська область"
+   }
+  ],
+  "036": [
+   {
+    "admin1": "Рівненська область"
+   }
+  ],
+  "037": [
+   {
+    "admin1": "Чернівецька область"
+   }
+  ],
+  "038": [
+   {
+    "admin1": "Хмельницька область"
+   }
+  ],
+  "041": [
+   {
+    "admin1": "Житомирська область"
+   }
+  ],
+  "043": [
+   {
+    "admin1": "Вінницька область"
+   }
+  ],
+  "044": [
+   {
+    "admin1": "Київ",
+    "note": "city of Kyiv only; the surrounding Kyiv oblast is 045"
+   }
+  ],
+  "045": [
+   {
+    "admin1": "Київська область"
+   }
+  ],
+  "046": [
+   {
+    "admin1": "Чернігівська область"
+   }
+  ],
+  "047": [
+   {
+    "admin1": "Черкаська область"
+   }
+  ],
+  "048": [
+   {
+    "admin1": "Одеська область"
+   }
+  ],
+  "051": [
+   {
+    "admin1": "Миколаївська область"
+   }
+  ],
+  "052": [
+   {
+    "admin1": "Кіровоградська область"
+   }
+  ],
+  "053": [
+   {
+    "admin1": "Полтавська область"
+   }
+  ],
+  "054": [
+   {
+    "admin1": "Сумська область"
+   }
+  ],
+  "055": [
+   {
+    "admin1": "Херсонська область"
+   }
+  ],
+  "056": [
+   {
+    "admin1": "Дніпропетровська область"
+   }
+  ],
+  "057": [
+   {
+    "admin1": "Харківська область"
+   }
+  ],
+  "061": [
+   {
+    "admin1": "Запорізька область"
+   }
+  ],
+  "062": [
+   {
+    "admin1": "Донецька область"
+   }
+  ],
+  "064": [
+   {
+    "admin1": "Луганська область"
+   }
+  ],
+  "065": [
+   {
+    "admin1": "Автономна Республіка Крим"
+   }
+  ],
+  "069": [
+   {
+    "admin1": "Севастополь"
+   }
+  ]
+ }
+}

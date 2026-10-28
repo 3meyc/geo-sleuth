@@ -128,12 +128,14 @@ def load_table(pack: dict, rel: str) -> dict:
 
 def normalize(value: str, spec: dict) -> str:
     v = unicodedata.normalize("NFKC", value or "") if spec.get("fullwidth", True) else (value or "")
+    if spec.get("upper", True):
+        v = v.upper()
+    # translate: one character → its stand-in (UA plates: Latin look-alikes → the Cyrillic letters the table uses)
+    v = v.translate(str.maketrans(spec.get("translate") or {}))
     for ch in spec.get("strip", " "):
         v = v.replace(ch, "")
     if spec.get("digits_only"):
         v = re.sub(r"\D", "", v)
-    if spec.get("upper", True):
-        v = v.upper()
     pre = spec.get("ensure_prefix")
     if pre and v and not v.startswith(pre):
         v = pre + v
@@ -251,11 +253,16 @@ def level_name(pack: dict, admin_level) -> str:
 
 
 def strip_suffix(name: str, pack: dict) -> str:
-    """Name without one of the pack's generic suffixes (CN: 市/省/区/县), for matching names across sources."""
-    out = name or ""
+    """Name without one of the pack's generic suffixes (CN: 市/省/区/县; UA: область, район after a space), for matching names across sources."""
+    out = (name or "").strip()
     for s in pack.get("name_suffixes") or []:
-        if out.endswith(s) and len(out) > len(s):
-            return out[: -len(s)]
+        if not out.endswith(s) or len(out) <= len(s):
+            continue
+        head = out[: -len(s)]
+        is_word = any(c.isupper() or c.islower() for c in s)   # cased scripts write suffixes as words; Han suffixes attach
+        if is_word and not head[-1].isspace():
+            continue
+        return head.rstrip()
     return out
 
 
@@ -450,6 +457,9 @@ def _lint_table(pack: dict, kind: str, spec: dict, errs: list, warns: list) -> N
             re.compile(meta["key_pattern"])
         except re.error as exc:
             errs.append(f"{spec['file']}: key_pattern doesn't compile ({exc})")
+    tr = (meta.get("normalize") or {}).get("translate")
+    if tr is not None and not (isinstance(tr, dict) and all(isinstance(k, str) and len(k) == 1 and isinstance(v, str) for k, v in tr.items())):
+        errs.append(f"{spec['file']}: normalize.translate must map single characters to strings")
     if not isinstance(entries, dict) or not entries:
         errs.append(f"{spec['file']}: 'entries' must be a non-empty object of key → [match, ...]")
         return

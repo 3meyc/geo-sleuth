@@ -1,0 +1,846 @@
+{
+ "_meta": {
+  "kind": "plate",
+  "normalize": {
+   "strip": " -·.",
+   "upper": true,
+   "translate": {
+    "A": "А",
+    "B": "В",
+    "C": "С",
+    "E": "Е",
+    "H": "Н",
+    "I": "І",
+    "K": "К",
+    "M": "М",
+    "O": "О",
+    "P": "Р",
+    "T": "Т",
+    "X": "Х"
+   }
+  },
+  "key_pattern": "^(?:[АВСЕНІКМОРТХ]{2}|ЕD|DС|DІ|РD)(?=(?:\\d{4}[АВСЕНІКМОРТХ]{2})?$)|^\\d{2}(?=\\d{5}[АВСЕНІКМОРТХ]{2}$)",
+  "usage": "a whole plate (ВН 1234 АХ, Latin look-alikes accepted: BH 1234 AX), just the two left letters (ВН), or a 1995–2004 plate with its small region number first (16 123-45 ОА)",
+  "note": "The code is where the vehicle was registered, not where the photo was taken. Letters are the 12 Cyrillic letters that look Latin; Latin input is mapped to them. Each region has four codes (2004, 2013, 2021 ×2).",
+  "miss_note": "not a regional code: ED/DC (registered online through the driver's e-cabinet) and DI/PD (through Diia) carry no region; ІІ was a nationwide series withdrawn from 2006; 28 was the 1995–2004 nationwide number; or a misread letter",
+  "source": [
+   "https://zakon.rada.gov.ua/laws/show/z0353-21 (MVS order 166 of 02.03.2021, Annex 4, edition of order 761 of 03.11.2025; online-registration codes in section VIII.5)",
+   "https://uk.wikipedia.org/wiki/Номерні_знаки_України (code eras; 1995–2004 numeric region codes)"
+  ],
+  "fetched": "2026-10-28",
+  "license": "Official text of Ukraine (not subject to copyright, Copyright Act art. 10); Wikipedia parts CC BY-SA 4.0",
+  "count": 135
+ },
+ "entries": {
+  "АК": [
+   {
+    "admin1": "Автономна Республіка Крим",
+    "note": "2004 series"
+   }
+  ],
+  "МА": [
+   {
+    "admin1": "Автономна Республіка Крим",
+    "note": "second code in the official table; Wikipedia gives КК for 2013, but КК is Kyiv's in the official table, so the era is not confirmed"
+   }
+  ],
+  "ТК": [
+   {
+    "admin1": "Автономна Республіка Крим",
+    "note": "2021 series"
+   }
+  ],
+  "МК": [
+   {
+    "admin1": "Автономна Республіка Крим",
+    "note": "2021 series"
+   }
+  ],
+  "АВ": [
+   {
+    "admin1": "Вінницька область",
+    "note": "2004 series"
+   }
+  ],
+  "КВ": [
+   {
+    "admin1": "Вінницька область",
+    "note": "2013 series"
+   }
+  ],
+  "ІМ": [
+   {
+    "admin1": "Вінницька область",
+    "note": "2021 series"
+   }
+  ],
+  "РІ": [
+   {
+    "admin1": "Вінницька область",
+    "note": "2021 series"
+   }
+  ],
+  "АС": [
+   {
+    "admin1": "Волинська область",
+    "note": "2004 series"
+   }
+  ],
+  "КС": [
+   {
+    "admin1": "Волинська область",
+    "note": "2013 series"
+   }
+  ],
+  "СМ": [
+   {
+    "admin1": "Волинська область",
+    "note": "2021 series"
+   }
+  ],
+  "ТС": [
+   {
+    "admin1": "Волинська область",
+    "note": "2021 series"
+   }
+  ],
+  "АЕ": [
+   {
+    "admin1": "Дніпропетровська область",
+    "note": "2004 series"
+   }
+  ],
+  "КЕ": [
+   {
+    "admin1": "Дніпропетровська область",
+    "note": "2013 series"
+   }
+  ],
+  "РР": [
+   {
+    "admin1": "Дніпропетровська область",
+    "note": "2021 series"
+   }
+  ],
+  "МІ": [
+   {
+    "admin1": "Дніпропетровська область",
+    "note": "2021 series"
+   }
+  ],
+  "АН": [
+   {
+    "admin1": "Донецька область",
+    "note": "2004 series"
+   }
+  ],
+  "КН": [
+   {
+    "admin1": "Донецька область",
+    "note": "2013 series"
+   }
+  ],
+  "ТН": [
+   {
+    "admin1": "Донецька область",
+    "note": "2021 series"
+   }
+  ],
+  "МН": [
+   {
+    "admin1": "Донецька область",
+    "note": "2021 series"
+   }
+  ],
+  "АМ": [
+   {
+    "admin1": "Житомирська область",
+    "note": "2004 series"
+   }
+  ],
+  "КМ": [
+   {
+    "admin1": "Житомирська область",
+    "note": "2013 series"
+   }
+  ],
+  "ТМ": [
+   {
+    "admin1": "Житомирська область",
+    "note": "2021 series"
+   }
+  ],
+  "МВ": [
+   {
+    "admin1": "Житомирська область",
+    "note": "2021 series"
+   }
+  ],
+  "АО": [
+   {
+    "admin1": "Закарпатська область",
+    "note": "2004 series"
+   }
+  ],
+  "КО": [
+   {
+    "admin1": "Закарпатська область",
+    "note": "2013 series"
+   }
+  ],
+  "МТ": [
+   {
+    "admin1": "Закарпатська область",
+    "note": "2021 series"
+   }
+  ],
+  "МО": [
+   {
+    "admin1": "Закарпатська область",
+    "note": "2021 series"
+   }
+  ],
+  "АР": [
+   {
+    "admin1": "Запорізька область",
+    "note": "2004 series"
+   }
+  ],
+  "КР": [
+   {
+    "admin1": "Запорізька область",
+    "note": "2013 series"
+   }
+  ],
+  "ТР": [
+   {
+    "admin1": "Запорізька область",
+    "note": "2021 series"
+   }
+  ],
+  "МР": [
+   {
+    "admin1": "Запорізька область",
+    "note": "2021 series"
+   }
+  ],
+  "АТ": [
+   {
+    "admin1": "Івано-Франківська область",
+    "note": "2004 series"
+   }
+  ],
+  "КТ": [
+   {
+    "admin1": "Івано-Франківська область",
+    "note": "2013 series"
+   }
+  ],
+  "ТО": [
+   {
+    "admin1": "Івано-Франківська область",
+    "note": "2021 series"
+   }
+  ],
+  "ХС": [
+   {
+    "admin1": "Івано-Франківська область",
+    "note": "2021 series"
+   }
+  ],
+  "АІ": [
+   {
+    "admin1": "Київська область",
+    "note": "2004 series"
+   }
+  ],
+  "КІ": [
+   {
+    "admin1": "Київська область",
+    "note": "2013 series"
+   }
+  ],
+  "ТІ": [
+   {
+    "admin1": "Київська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕЕ": [
+   {
+    "admin1": "Київська область",
+    "note": "2021 series"
+   }
+  ],
+  "АА": [
+   {
+    "admin1": "Київ",
+    "note": "2004 series"
+   }
+  ],
+  "КА": [
+   {
+    "admin1": "Київ",
+    "note": "2013 series"
+   }
+  ],
+  "ТТ": [
+   {
+    "admin1": "Київ",
+    "note": "2021 series"
+   }
+  ],
+  "КК": [
+   {
+    "admin1": "Київ",
+    "note": "2021 series"
+   }
+  ],
+  "ВА": [
+   {
+    "admin1": "Кіровоградська область",
+    "note": "2004 series"
+   }
+  ],
+  "НА": [
+   {
+    "admin1": "Кіровоградська область",
+    "note": "2013 series"
+   }
+  ],
+  "ХА": [
+   {
+    "admin1": "Кіровоградська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕА": [
+   {
+    "admin1": "Кіровоградська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВВ": [
+   {
+    "admin1": "Луганська область",
+    "note": "2004 series"
+   }
+  ],
+  "НВ": [
+   {
+    "admin1": "Луганська область",
+    "note": "2013 series"
+   }
+  ],
+  "ЕР": [
+   {
+    "admin1": "Луганська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕВ": [
+   {
+    "admin1": "Луганська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВС": [
+   {
+    "admin1": "Львівська область",
+    "note": "2004 series"
+   }
+  ],
+  "НС": [
+   {
+    "admin1": "Львівська область",
+    "note": "2013 series"
+   }
+  ],
+  "СС": [
+   {
+    "admin1": "Львівська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕС": [
+   {
+    "admin1": "Львівська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВЕ": [
+   {
+    "admin1": "Миколаївська область",
+    "note": "2004 series"
+   }
+  ],
+  "НЕ": [
+   {
+    "admin1": "Миколаївська область",
+    "note": "2013 series"
+   }
+  ],
+  "ХЕ": [
+   {
+    "admin1": "Миколаївська область",
+    "note": "2021 series"
+   }
+  ],
+  "ХН": [
+   {
+    "admin1": "Миколаївська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВН": [
+   {
+    "admin1": "Одеська область",
+    "note": "2004 series"
+   }
+  ],
+  "НН": [
+   {
+    "admin1": "Одеська область",
+    "note": "2013 series"
+   }
+  ],
+  "ОО": [
+   {
+    "admin1": "Одеська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕН": [
+   {
+    "admin1": "Одеська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВІ": [
+   {
+    "admin1": "Полтавська область",
+    "note": "2004 series"
+   }
+  ],
+  "НІ": [
+   {
+    "admin1": "Полтавська область",
+    "note": "2013 series"
+   }
+  ],
+  "ХІ": [
+   {
+    "admin1": "Полтавська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕІ": [
+   {
+    "admin1": "Полтавська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВК": [
+   {
+    "admin1": "Рівненська область",
+    "note": "2004 series"
+   }
+  ],
+  "НК": [
+   {
+    "admin1": "Рівненська область",
+    "note": "2013 series"
+   }
+  ],
+  "ХК": [
+   {
+    "admin1": "Рівненська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕК": [
+   {
+    "admin1": "Рівненська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВМ": [
+   {
+    "admin1": "Сумська область",
+    "note": "2004 series"
+   }
+  ],
+  "НМ": [
+   {
+    "admin1": "Сумська область",
+    "note": "2013 series"
+   }
+  ],
+  "ХМ": [
+   {
+    "admin1": "Сумська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕМ": [
+   {
+    "admin1": "Сумська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВО": [
+   {
+    "admin1": "Тернопільська область",
+    "note": "2004 series"
+   }
+  ],
+  "НО": [
+   {
+    "admin1": "Тернопільська область",
+    "note": "2013 series"
+   }
+  ],
+  "ХО": [
+   {
+    "admin1": "Тернопільська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕО": [
+   {
+    "admin1": "Тернопільська область",
+    "note": "2021 series"
+   }
+  ],
+  "АХ": [
+   {
+    "admin1": "Харківська область",
+    "note": "2004 series"
+   }
+  ],
+  "КХ": [
+   {
+    "admin1": "Харківська область",
+    "note": "2013 series"
+   }
+  ],
+  "ХХ": [
+   {
+    "admin1": "Харківська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕХ": [
+   {
+    "admin1": "Харківська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВТ": [
+   {
+    "admin1": "Херсонська область",
+    "note": "2004 series"
+   }
+  ],
+  "НТ": [
+   {
+    "admin1": "Херсонська область",
+    "note": "2013 series"
+   }
+  ],
+  "ХТ": [
+   {
+    "admin1": "Херсонська область",
+    "note": "2021 series"
+   }
+  ],
+  "ЕТ": [
+   {
+    "admin1": "Херсонська область",
+    "note": "2021 series"
+   }
+  ],
+  "ВХ": [
+   {
+    "admin1": "Хмельницька область",
+    "note": "2004 series"
+   }
+  ],
+  "НХ": [
+   {
+    "admin1": "Хмельницька область",
+    "note": "2013 series"
+   }
+  ],
+  "ОХ": [
+   {
+    "admin1": "Хмельницька область",
+    "note": "2021 series"
+   }
+  ],
+  "РХ": [
+   {
+    "admin1": "Хмельницька область",
+    "note": "2021 series"
+   }
+  ],
+  "СА": [
+   {
+    "admin1": "Черкаська область",
+    "note": "2004 series"
+   }
+  ],
+  "ІА": [
+   {
+    "admin1": "Черкаська область",
+    "note": "2013 series"
+   }
+  ],
+  "ОА": [
+   {
+    "admin1": "Черкаська область",
+    "note": "2021 series"
+   }
+  ],
+  "РА": [
+   {
+    "admin1": "Черкаська область",
+    "note": "2021 series"
+   }
+  ],
+  "СВ": [
+   {
+    "admin1": "Чернігівська область",
+    "note": "2004 series"
+   }
+  ],
+  "ІВ": [
+   {
+    "admin1": "Чернігівська область",
+    "note": "2013 series"
+   }
+  ],
+  "ОВ": [
+   {
+    "admin1": "Чернігівська область",
+    "note": "2021 series"
+   }
+  ],
+  "РВ": [
+   {
+    "admin1": "Чернігівська область",
+    "note": "2021 series"
+   }
+  ],
+  "СЕ": [
+   {
+    "admin1": "Чернівецька область",
+    "note": "2004 series"
+   }
+  ],
+  "ІЕ": [
+   {
+    "admin1": "Чернівецька область",
+    "note": "2013 series"
+   }
+  ],
+  "ОЕ": [
+   {
+    "admin1": "Чернівецька область",
+    "note": "2021 series"
+   }
+  ],
+  "РЕ": [
+   {
+    "admin1": "Чернівецька область",
+    "note": "2021 series"
+   }
+  ],
+  "СН": [
+   {
+    "admin1": "Севастополь",
+    "note": "2004 series"
+   }
+  ],
+  "ІН": [
+   {
+    "admin1": "Севастополь",
+    "note": "2013 series"
+   }
+  ],
+  "ОН": [
+   {
+    "admin1": "Севастополь",
+    "note": "2021 series"
+   }
+  ],
+  "РН": [
+   {
+    "admin1": "Севастополь",
+    "note": "2021 series"
+   }
+  ],
+  "01": [
+   {
+    "admin1": "Автономна Республіка Крим",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "02": [
+   {
+    "admin1": "Вінницька область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "03": [
+   {
+    "admin1": "Волинська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "04": [
+   {
+    "admin1": "Дніпропетровська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "05": [
+   {
+    "admin1": "Донецька область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "06": [
+   {
+    "admin1": "Житомирська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "07": [
+   {
+    "admin1": "Закарпатська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "08": [
+   {
+    "admin1": "Запорізька область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "09": [
+   {
+    "admin1": "Івано-Франківська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "10": [
+   {
+    "admin1": "Київська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "11": [
+   {
+    "admin1": "Київ",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "12": [
+   {
+    "admin1": "Кіровоградська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "13": [
+   {
+    "admin1": "Луганська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "14": [
+   {
+    "admin1": "Львівська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "15": [
+   {
+    "admin1": "Миколаївська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "16": [
+   {
+    "admin1": "Одеська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "17": [
+   {
+    "admin1": "Полтавська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "18": [
+   {
+    "admin1": "Рівненська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "19": [
+   {
+    "admin1": "Сумська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "20": [
+   {
+    "admin1": "Тернопільська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "21": [
+   {
+    "admin1": "Харківська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "22": [
+   {
+    "admin1": "Херсонська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "23": [
+   {
+    "admin1": "Хмельницька область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "24": [
+   {
+    "admin1": "Черкаська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "25": [
+   {
+    "admin1": "Чернігівська область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "26": [
+   {
+    "admin1": "Чернівецька область",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ],
+  "27": [
+   {
+    "admin1": "Севастополь",
+    "note": "1995–2004 plate: numeric region code under the flag"
+   }
+  ]
+ }
+}

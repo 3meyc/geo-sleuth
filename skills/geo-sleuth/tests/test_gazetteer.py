@@ -57,7 +57,8 @@ class BilingualNames(unittest.TestCase):
             self.assertIn(f'rel(area.p)["{key}"="A \\"B\\""]["boundary"="administrative"]["admin_level"="4"];', sel)
 
     def test_extra_name_keys_come_from_region_packs_not_core(self):
-        self.assertEqual(gazetteer.regions.osm_name_keys(), ("name", "name:zh", "name:zh-Hans"))   # declared by the CN pack
+        self.assertEqual(gazetteer.regions.osm_name_keys(),   # declared by the CN and UA packs
+                         ("name", "name:en", "name:ru", "name:uk", "name:zh", "name:zh-Hans"))
         with patch.object(gazetteer.regions, "packs", return_value={}):
             self.assertEqual(gazetteer.regions.osm_name_keys(), ("name",))
             self.assertEqual(gazetteer._by_name("X"), '(rel["name"="X"]["boundary"="administrative"];)')

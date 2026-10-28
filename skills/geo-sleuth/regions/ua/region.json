@@ -1,0 +1,30 @@
+{
+ "code": "UA",
+ "name": "Ukraine",
+ "names": ["Ukraine", "Україна", "Украина", "Ukraina", "UA"],
+ "status": "community",
+ "maintainers": ["@3meyc-ua"],
+ "admin_levels": {"4": "admin1", "6": "admin2", "7": "district"},
+ "level_names": {"admin1": "oblast (and Kyiv, Sevastopol, Crimea)", "admin2": "raion", "district": "hromada (territorial community)"},
+ "name_suffixes": ["міська територіальна громада", "селищна територіальна громада", "сільська територіальна громада",
+                   "територіальна громада", "міська громада", "селищна громада", "сільська громада", "громада",
+                   "міська рада", "селищна рада", "сільська рада", "міськрада", "область", "район",
+                   "городская громада", "поселковая громада", "сельская громада", "городская община", "община",
+                   "городской совет", "горсовет", "поселковый совет", "сельский совет"],
+ "admin_table": "data/admin.json",
+ "osm_name_keys": ["name:uk", "name:ru", "name:en"],
+ "lookups": {
+  "plate": {"file": "data/plates.json"},
+  "area-code": {"file": "data/area_codes.json"},
+  "road-number": {"file": "data/road_numbers.json"}
+ },
+ "docs": ["clues.md"],
+ "services": {
+  "poi": {"sources": "osm", "country": "ua"},
+  "street_view": "gsv.py"
+ },
+ "tips": {
+  "livery": "tram, trolleybus or bus livery → `revimg.py --query \"<місто> трамвай <колір>\"` (query in Ukrainian); only 17 cities have a tram system (clues.md, Transport)",
+  "municipal": "address plates, stop signs and street-name plates differ by city (clues.md, Street furniture) → `gsv.py sheet --points` per candidate; Google Street View in Kyiv dates from 2011 and 2015, so compare invariant features only"
+ }
+}

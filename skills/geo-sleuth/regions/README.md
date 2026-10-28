@@ -48,7 +48,7 @@ regions/<cc>/
 | `docs` | Markdown files the card indexes |
 | `admin_levels` | admin table `level` → board level: `admin1`, `admin2`, `city`, `district` |
 | `level_names` | what the levels are called locally, for the card |
-| `name_suffixes` | generic suffixes ignored when matching names across sources (CN: 市, 省, 区, 县) |
+| `name_suffixes` | generic suffixes ignored when matching names across sources (CN: 市, 省, 区, 县; UA: область, район). Suffixes in a cased script (Latin, Cyrillic) are whole words: they strip only after a space; list longer ones first |
 | `admin_table` | optional; lets `board.py children` check OSM's list and gives candidates stable ids |
 | `also_children` | optional; OSM relation names `board.py children <country>` lists next to the first-level divisions when OSM's admin tree leaves them out or puts them at another level (CN: Hong Kong, Macau, Taiwan) |
 | `osm_name_keys` | optional; extra OSM `name:*` tags that place-name lookups also match (CN: `name:zh`, `name:zh-Hans`, because OSM's `name` adds a second script for some regions and simplified forms only exist there). Core scripts match `name` plus every installed pack's keys |
@@ -78,7 +78,7 @@ regions/<cc>/
 }
 ```
 
-- Lookup = normalize the value (`normalize`: `strip` characters, `digits_only`, `upper`, `ensure_prefix`), cut it with `key_pattern` if given (a value that doesn't fit is "not this country's format"), then take the **longest key that is a prefix** of it.
+- Lookup = normalize the value (`normalize`, in this order: `upper`, `translate` (an object mapping one character to its stand-in, e.g. UA plates map Latin look-alikes to Cyrillic), `strip` characters, `digits_only`, `ensure_prefix`), cut it with `key_pattern` if given (a value that doesn't fit is "not this country's format"), then take the **longest key that is a prefix** of it.
 - Each key maps to a **list**. A key that covers several places lists every one of them; never merge two places into one name, and never pick one. The board keeps them all as hypotheses.
 - A match names admin levels explicitly (`admin1` … `district`) with the names as the admin table or OSM spells them, plus optional `note` and `unverified: true` for rows not backed by the source.
 - A key that covers only part of an area (part of a state, part of a district) names the larger area and says what part in `note`.

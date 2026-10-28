@@ -1,0 +1,155 @@
+{
+ "_meta": {
+  "kind": "road-number",
+  "normalize": {
+   "strip": " -‑–",
+   "upper": true,
+   "translate": {
+    "T": "Т"
+   }
+  },
+  "key_pattern": "^Т\\d{2}(?=\\d{2}$|$)",
+  "usage": "a territorial road number from a route marker or kilometre post: Т-16-07, T1607, or just Т-16",
+  "note": "The two digits after Т are the oblast index (the same 01–27 order as 1995–2004 plates; Kyiv city, 11, has no Т roads). A few roads keep their index across an oblast border.",
+  "miss_note": "not a territorial road: М (international), Н (national) and Р (regional) numbers are nationwide; О (oblast) and С (raion) local roads are not in the table",
+  "source": [
+   "https://zakon.rada.gov.ua/laws/show/1318-2023-п (Cabinet resolution 1318 of 15.12.2023: list of state roads, indices Т-01…Т-27)",
+   "https://uk.wikipedia.org/wiki/Територіальні_автомобільні_шляхи_України (same list grouped by oblast)"
+  ],
+  "fetched": "2026-10-28",
+  "license": "Official text of Ukraine (not subject to copyright, Copyright Act art. 10); Wikipedia grouping CC BY-SA 4.0",
+  "count": 26
+ },
+ "entries": {
+  "Т01": [
+   {
+    "admin1": "Автономна Республіка Крим"
+   }
+  ],
+  "Т02": [
+   {
+    "admin1": "Вінницька область"
+   }
+  ],
+  "Т03": [
+   {
+    "admin1": "Волинська область"
+   }
+  ],
+  "Т04": [
+   {
+    "admin1": "Дніпропетровська область"
+   }
+  ],
+  "Т05": [
+   {
+    "admin1": "Донецька область"
+   }
+  ],
+  "Т06": [
+   {
+    "admin1": "Житомирська область"
+   }
+  ],
+  "Т07": [
+   {
+    "admin1": "Закарпатська область"
+   }
+  ],
+  "Т08": [
+   {
+    "admin1": "Запорізька область"
+   }
+  ],
+  "Т09": [
+   {
+    "admin1": "Івано-Франківська область"
+   }
+  ],
+  "Т10": [
+   {
+    "admin1": "Київська область"
+   }
+  ],
+  "Т12": [
+   {
+    "admin1": "Кіровоградська область"
+   }
+  ],
+  "Т13": [
+   {
+    "admin1": "Луганська область"
+   }
+  ],
+  "Т14": [
+   {
+    "admin1": "Львівська область"
+   }
+  ],
+  "Т15": [
+   {
+    "admin1": "Миколаївська область"
+   }
+  ],
+  "Т16": [
+   {
+    "admin1": "Одеська область"
+   }
+  ],
+  "Т17": [
+   {
+    "admin1": "Полтавська область"
+   }
+  ],
+  "Т18": [
+   {
+    "admin1": "Рівненська область"
+   }
+  ],
+  "Т19": [
+   {
+    "admin1": "Сумська область"
+   }
+  ],
+  "Т20": [
+   {
+    "admin1": "Тернопільська область"
+   }
+  ],
+  "Т21": [
+   {
+    "admin1": "Харківська область"
+   }
+  ],
+  "Т22": [
+   {
+    "admin1": "Херсонська область"
+   }
+  ],
+  "Т23": [
+   {
+    "admin1": "Хмельницька область"
+   }
+  ],
+  "Т24": [
+   {
+    "admin1": "Черкаська область"
+   }
+  ],
+  "Т26": [
+   {
+    "admin1": "Чернівецька область"
+   }
+  ],
+  "Т25": [
+   {
+    "admin1": "Чернігівська область"
+   }
+  ],
+  "Т27": [
+   {
+    "admin1": "Севастополь"
+   }
+  ]
+ }
+}

@@ -101,6 +101,21 @@ class BundledPacks(unittest.TestCase):
         d = regions.lookup("plate", "KA01AB1234")
         self.assertEqual(d["matches"], [])
 
+    def test_generic_suffix_after_a_space_is_ignored_when_matching_names(self):
+        for name, country, want in (("Adana İli", "tr", "Adana"), ("Одеська", "ua", "Одеська область")):
+            with self.subTest(name=name):
+                self.assertIn(want, [it["name"] for _, it in regions.admin_find(name, country)])
+        self.assertEqual(regions.strip_suffix("Мікрорайон", regions.resolve("ua")), "Мікрорайон")   # a suffix is a whole word
+
+    def test_board_finds_a_candidate_by_name_without_its_generic_suffix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            board = Path(tmp) / "board.json"
+            run("board.py", "--board", str(board), "init", "--photo", "x.jpg", "--country", "ua")
+            run("board.py", "--board", str(board), "apply", "--kind", "plate", "--value", "ВН 1234 АХ")
+            r = run("board.py", "--board", str(board), "falsify", "Одеська", "--text", "sea on the wrong side")
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertEqual(json.loads(board.read_text(encoding="utf-8"))["falsify"], {"Одеська область": ["sea on the wrong side"]})
+
     def test_same_name_districts_stay_apart(self):
         rows = run("clues.py", "lookup", "admin", "朝阳区", "--json")
         chains = {tuple(m["chain"]) for m in json.loads(rows.stdout)["matches"]}
@@ -131,6 +146,22 @@ class FixturePack(unittest.TestCase):
         self.assertEqual([m["admin2"] for m in d["matches"]], ["Porta"])
         d = self.lookup("area-code", "020", "--country", "cn")
         self.assertEqual([m["admin2"] for m in d["matches"]], ["广州市"])
+
+    def test_translate_maps_characters_after_upper_case_and_before_digits_only(self):
+        files = json.loads(json.dumps(FIXTURE))
+        files["data/area_codes.json"]["_meta"]["normalize"]["translate"] = {"O": "0"}
+        write_pack(self.root / "packs", files)
+        d = self.lookup("area-code", "o2o", "--country", "qq")
+        self.assertEqual([m["admin2"] for m in d["matches"]], ["Porta"])
+
+    def test_lint_rejects_a_translate_map_that_is_not_single_characters(self):
+        for value in (["O", "0"], {"OO": "0"}, {"O": 0}):
+            with self.subTest(value=value):
+                files = json.loads(json.dumps(FIXTURE))
+                files["data/area_codes.json"]["_meta"]["normalize"]["translate"] = value
+                d = write_pack(self.root / "bad-translate", files)
+                errs, _ = regions.lint(dict(files["region.json"], dir=d))
+                self.assertTrue(any("translate" in e for e in errs), errs)
 
     def test_removing_the_pack_leaves_cn_unchanged(self):
         with_pack = [m for m in self.lookup("area-code", "0817")["matches"] if m["country_code"] == "CN"]

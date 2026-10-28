@@ -88,7 +88,10 @@ CHEAP_OPS = [
 
 
 def _norm(s: str) -> str:
-    return re.sub(r"[\s（）()]", "", s or "").rstrip("市省区县自治州自治县自治区特别行政区")
+    s = s or ""
+    for pk in regions.packs().values():   # whole-word suffixes (UA: Одеська область → Одеська); rstrip below only drops characters
+        s = regions.strip_suffix(s, pk)
+    return re.sub(r"[\s（）()]", "", s).rstrip("市省区县自治州自治县自治区特别行政区")
 
 
 def _clue_kind(kind: str) -> str:
