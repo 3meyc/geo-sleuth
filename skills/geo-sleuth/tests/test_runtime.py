@@ -180,6 +180,30 @@ class DoctorTests(unittest.TestCase):
                 row = doctor.probe(("service", "https://example.invalid"), "direct")
                 self.assertEqual(row["status"], status)
 
+    def test_every_overpass_mirror_is_probed_and_one_dead_backup_only_warns(self):
+        def probe(item, proxy):
+            name, url = item
+            dead = "mail.ru" in url
+            return doctor.check(name, "FAIL" if dead else "PASS", "down" if dead else "HTTP 200 in 0.1 s")
+
+        with patch.object(doctor, "browser_check", AsyncMock(return_value=doctor.check("browser", "PASS", "ready"))), \
+                patch.object(doctor, "probe", side_effect=probe), \
+                patch.object(doctor, "street_view_check", return_value=doctor.check("Google Street View", "PASS", "ok")):
+            report = doctor.diagnose(True, None)
+        rows = {r["name"]: r["status"] for r in report["checks"] if r["name"].startswith("Overpass")}
+        self.assertEqual(rows, {"Overpass overpass-api.de": "PASS", "Overpass overpass.private.coffee": "PASS",
+                                "Overpass maps.mail.ru": "WARN"})
+        self.assertTrue(report["ok"])
+
+    def test_all_overpass_mirrors_down_fails(self):
+        with patch.object(doctor, "browser_check", AsyncMock(return_value=doctor.check("browser", "PASS", "ready"))), \
+                patch.object(doctor, "probe", side_effect=lambda item, proxy: doctor.check(
+                    item[0], "FAIL" if item[0].startswith("Overpass") else "PASS", "x")), \
+                patch.object(doctor, "street_view_check", return_value=doctor.check("Google Street View", "PASS", "ok")):
+            report = doctor.diagnose(True, None)
+        self.assertEqual({r["status"] for r in report["checks"] if r["name"].startswith("Overpass")}, {"FAIL"})
+        self.assertFalse(report["ok"])
+
     def test_local_checks_do_not_probe_network_or_print_proxy_credentials(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(doctor, "browser_check", AsyncMock(return_value=doctor.check("browser", "PASS", "ready"))), patch.object(doctor, "probe") as probe, patch.dict(os.environ, {"GEO_PROXY": "http://user:secret@localhost:8080"}):
             report = doctor.diagnose(False, None)
@@ -203,7 +227,7 @@ class OverpassMirrorTests(unittest.TestCase):
     def run_with(self, replies, ql=QH):
         calls = []
 
-        def post(ep, q, proxy, timeout):
+        def post(ep, q, proxy, timeout, **_):
             calls.append(ep)
             return replies(ep, q)
 
@@ -269,7 +293,7 @@ class OverpassMirrorTests(unittest.TestCase):
             cache = Path(d)
             key = cache / (hashlib.sha1(QH.encode()).hexdigest()[:16] + '.json')
             key.write_text(json.dumps({'elements': []}), encoding='utf-8')
-            with patch.object(osm, '_post', side_effect=lambda ep, *a: ({'elements': []}, '') if ep == osm.ENDPOINTS[0] else (None, '503')):
+            with patch.object(osm, '_post', side_effect=lambda ep, *a, **k: ({'elements': []}, '') if ep == osm.ENDPOINTS[0] else (None, '503')):
                 self.assertEqual(osm.run(QH, None, cache), {'elements': []})
             with patch.object(osm, '_post', return_value=({'elements': [LINE]}, '')) as post:
                 self.assertEqual(osm.run(QH, None, cache)['elements'], [LINE])
@@ -294,7 +318,7 @@ class OverpassMirrorTests(unittest.TestCase):
         replies = {e0: (None, "HTTP 504: server too busy"), e1: (None, "curl exit 7"), e2: (None, "curl exit 28")}
         calls = []
 
-        def post(ep, q, proxy, timeout):
+        def post(ep, q, proxy, timeout, **_):
             calls.append(ep)
             return replies[ep]
 
@@ -304,6 +328,42 @@ class OverpassMirrorTests(unittest.TestCase):
         self.assertEqual(calls, [e0, e1, e2, e0, e0])             # busy mirror retried each round, dead ones once
         for reason in ("504", "curl exit 7", "curl exit 28"):
             self.assertIn(reason, str(cm.exception))
+
+    def test_no_request_starts_after_the_overall_deadline(self):
+        clock = {"now": 0.0}
+        started = []
+
+        def post(ep, q, proxy, timeout, *, max_time_s):
+            started.append((clock["now"], max_time_s))
+            clock["now"] += 100                                  # every mirror takes 100 s to say it is busy
+            return None, "HTTP 504: server too busy"
+
+        def sleep(s):
+            clock["now"] += s
+
+        with tempfile.TemporaryDirectory() as d, patch.object(osm, "_post", side_effect=post), \
+                patch.object(osm.time, "sleep", side_effect=sleep), \
+                patch.object(osm.time, "monotonic", side_effect=lambda: clock["now"]), \
+                self.assertRaises(SystemExit) as cm:
+            osm.run(QH, None, Path(d), timeout=180)              # deadline 2 * (180 + 30) + 60 = 480 s
+        self.assertEqual([t for t, _ in started], [0, 100, 200, 315, 415])
+        for t, max_time in started:
+            self.assertLessEqual(max_time, 480 - t)              # no request may run past the deadline
+        self.assertEqual(started[0][1], 210)
+        self.assertIn("480 s", str(cm.exception))
+
+    def test_mirror_list_can_be_replaced_from_the_environment(self):
+        calls = []
+
+        def post(ep, q, proxy, timeout, **_):
+            calls.append(ep)
+            return {"elements": [LINE]}, ""
+
+        mine = "https://overpass.local.test/api/interpreter"
+        with tempfile.TemporaryDirectory() as d, patch.object(osm, "_post", side_effect=post), \
+                patch.dict(os.environ, {"GEO_OVERPASS_ENDPOINTS": f" {mine} ,"}):
+            osm.run(QH, None, Path(d))
+        self.assertEqual(calls, [mine])
 
     def test_error_remark_not_cached(self):
         def replies(ep, q):
@@ -1173,6 +1233,97 @@ class OrientationTests(unittest.TestCase):
             with contextlib.redirect_stderr(io.StringIO()) as err:
                 self.assertEqual(geo._spacing_ridge(str(path))["pts"], [[float(x), float(y)] for x, y in pts])
             self.assertEqual("stored frame" in err.getvalue(), warn, f"{name}: {err.getvalue()}")
+
+
+def _way(coords, **tags):
+    return {"type": "way", "id": 1, "tags": tags, "geometry": [{"lat": la, "lon": lo} for lo, la in coords]}
+
+
+SQUARE = [(30.0, 50.0), (30.1, 50.0), (30.1, 50.1), (30.0, 50.1), (30.0, 50.0)]
+
+
+class OsmGeomTests(unittest.TestCase):
+    """osm.py geom: an element becomes the GeoJSON geometry a map reader expects (areas as polygons, routes as lines)."""
+
+    def test_closed_ways_with_area_tags_are_polygons(self):
+        for tags in ({"amenity": "parking"}, {"leisure": "park"}, {"landuse": "residential"}, {"building": "yes"},
+                     {"barrier": "fence", "area": "yes"}):
+            with self.subTest(tags=tags):
+                self.assertEqual(osm.element_feature(_way(SQUARE, **tags))["geometry"]["type"], "Polygon")
+
+    def test_closed_linear_ways_stay_lines(self):
+        for tags in ({"highway": "residential"}, {"barrier": "fence"}, {"natural": "coastline"},
+                     {"amenity": "parking", "area": "no"}):
+            with self.subTest(tags=tags):
+                self.assertEqual(osm.element_feature(_way(SQUARE, **tags))["geometry"]["type"], "LineString")
+
+    def test_multipolygon_relation_joins_split_outer_ring_and_keeps_its_hole(self):
+        hole = [(30.04, 50.04), (30.06, 50.04), (30.06, 50.06), (30.04, 50.04)]
+        rel = {"type": "relation", "id": 7, "tags": {"type": "multipolygon", "leisure": "park"}, "members": [
+            {"type": "way", "role": "outer", "geometry": [{"lat": la, "lon": lo} for lo, la in SQUARE[:3]]},
+            {"type": "way", "role": "outer", "geometry": [{"lat": la, "lon": lo} for lo, la in reversed(SQUARE[2:])]},
+            {"type": "way", "role": "inner", "geometry": [{"lat": la, "lon": lo} for lo, la in hole]},
+        ]}
+        ft = osm.element_feature(rel)
+        self.assertEqual(ft["id"], "relation/7")
+        self.assertEqual(ft["geometry"]["type"], "MultiPolygon")
+        (outer, inner), = ft["geometry"]["coordinates"]
+        self.assertEqual(sorted(map(tuple, outer[:-1])), sorted(SQUARE[:-1]))
+        self.assertEqual(outer[0], outer[-1])
+        self.assertEqual([tuple(c) for c in inner], hole)
+
+    def test_relation_without_member_geometry_is_skipped(self):
+        rel = {"type": "relation", "id": 8, "tags": {"type": "multipolygon"}, "members": [{"type": "way", "role": "outer"}]}
+        self.assertIsNone(osm.element_feature(rel))
+
+
+class AtomicWriteTests(unittest.TestCase):
+    """Files other runs read (board.json, caches) are replaced whole or not at all."""
+
+    def test_failed_replace_keeps_the_old_file_and_leaves_no_temp(self):
+        import _files
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d, "board.json")
+            p.write_text("old", encoding="utf-8")
+            with patch.object(_files.os, "replace", side_effect=OSError("disk full")), self.assertRaises(OSError):
+                _files.write_atomic(p, "new")
+            self.assertEqual(p.read_text(encoding="utf-8"), "old")
+            self.assertEqual(sorted(f.name for f in Path(d).iterdir()), ["board.json"])
+            _files.write_atomic(p, "new")
+            self.assertEqual(p.read_text(encoding="utf-8"), "new")
+
+
+class TileCacheTests(unittest.TestCase):
+    """tiles.py: only a real image is cached; an error page saved under a tile name is fetched again."""
+
+    def _curl(self, body: bytes, code: int = 0):
+        def run(cmd, **kw):
+            Path(cmd[cmd.index("-o") + 1]).write_bytes(body)
+            return SimpleNamespace(returncode=code)
+        return run
+
+    def _png(self):
+        buf = io.BytesIO()
+        Image.new("RGB", (256, 256), (10, 120, 40)).save(buf, "PNG")
+        return buf.getvalue()
+
+    def test_error_page_is_not_cached(self):
+        import tiles
+        with tempfile.TemporaryDirectory() as d, patch.object(tiles.subprocess, "run", side_effect=self._curl(b"<html>" + b"x" * 2000)):
+            p = Path(d, "17_1_1.jpg")
+            self.assertFalse(tiles._get("https://tile.test/1", p, None))
+            self.assertEqual(list(Path(d).iterdir()), [])
+
+    def test_cached_error_page_is_fetched_again(self):
+        import tiles
+        with tempfile.TemporaryDirectory() as d, patch.object(tiles.subprocess, "run", side_effect=self._curl(self._png())) as run:
+            p = Path(d, "17_1_1.jpg")
+            p.write_bytes(b"<html>rate limited</html>" + b" " * 2000)
+            self.assertTrue(tiles._get("https://tile.test/1", p, None))
+            self.assertEqual(run.call_count, 1)
+            with Image.open(p) as im:
+                self.assertEqual(im.size, (256, 256))
+            self.assertEqual(sorted(f.name for f in Path(d).iterdir()), ["17_1_1.jpg"])
 
 
 class TilesMarkTests(unittest.TestCase):

@@ -29,13 +29,13 @@ from pathlib import Path
 
 from _browser import launch_browser
 from _net import PROXY_HELP, curl_args, resolve_proxy
+import osm
 import regions
 
 SERVICES = {
     "Baidu image search": "https://graph.baidu.com/pcpage/index?tpl_from=pc",
     "Baidu panoramas": "https://mapsv0.bdimg.com/?qt=qsdata&x=0&y=0",
     "Google satellite tiles": "https://mt1.google.com/vt/lyrs=s&x=0&y=0&z=0",
-    "Overpass": "https://overpass-api.de/api/status",
     "Elevation tiles": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/0/0/0.png",
     "Hugging Face": "https://huggingface.co/",
 }
@@ -56,18 +56,31 @@ def probe(item: tuple[str, str], proxy: str | None) -> dict:
     try:
         result = subprocess.run(
             ["curl", "-q", "-sSL", "--max-time", "12", *curl_args(proxy),
-             "-A", "geo-sleuth-doctor/1.0", "-o", os.devnull, "-w", "%{http_code}", url],
+             "-A", "geo-sleuth-doctor/1.0", "-o", os.devnull, "-w", "%{http_code} %{time_total}", url],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
-        code = result.stdout.strip()
+        code, _, took = result.stdout.strip().partition(" ")
+        took = f" in {float(took):.1f} s" if took.replace(".", "", 1).isdigit() else ""
         if result.returncode:
             return check(name, "FAIL", f"Connection failed (curl exit {result.returncode}).",
                          "Check DNS, TLS certificates and network access.")
         if code.isdigit() and 200 <= int(code) < 400:
-            return check(name, "PASS", f"HTTP {code}; reachable (a live operation can still be blocked or rate-limited).")
+            return check(name, "PASS", f"HTTP {code}{took}; reachable (a live operation can still be blocked or rate-limited).")
         return check(name, "WARN", f"HTTP {code}; server reached, but service access was not confirmed.",
                      "Retry later or inspect the service in a browser. HTTP 403/429 may mean a challenge or rate limit.")
     except (OSError, subprocess.TimeoutExpired):
         return check(name, "FAIL", "Probe could not complete within its time limit.", "Check curl and network access, then retry.")
+
+
+def overpass_checks(proxy: str | None) -> list[dict]:
+    """One probe per Overpass mirror osm.py would try. A dead mirror only warns while another answers: osm.py skips it after
+    its first failure. All mirrors down is a failure."""
+    items = [(f"Overpass {url.split('/')[2]}", url.rsplit("/", 1)[0] + "/status") for url in osm.endpoints()]
+    with ThreadPoolExecutor(max_workers=len(items)) as pool:
+        rows = list(pool.map(lambda item: probe(item, proxy), items))
+    if any(row["status"] == "PASS" for row in rows):
+        rows = [dict(row, status="WARN", fix="osm.py skips this mirror after its first failure; to leave it out, set "
+                     "GEO_OVERPASS_ENDPOINTS to the working mirrors.") if row["status"] == "FAIL" else row for row in rows]
+    return rows
 
 
 def street_view_check(proxy: str | None) -> dict:
@@ -155,6 +168,7 @@ def diagnose(network: bool, proxy: str | None) -> dict:
     if network and shutil.which("curl"):
         with ThreadPoolExecutor(max_workers=8) as pool:
             rows.extend(pool.map(lambda item: probe(item, proxy), SERVICES.items()))
+        rows.extend(overpass_checks(proxy))
         rows.append(street_view_check(proxy))
     else:
         rows.append(check("Network probes", "SKIP", "Run with --network to check service reachability."))

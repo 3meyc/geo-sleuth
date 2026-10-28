@@ -22,6 +22,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+from _files import temp_path
 from _net import curl_args, PROXY_HELP
 import json
 import os
@@ -42,13 +43,32 @@ SOURCES = {
 }
 
 
-def _get(url: str, path: Path, proxy: str | None) -> bool:
-    if path.exists() and path.stat().st_size > 1000:
+def _is_tile(path: Path) -> bool:
+    """A readable image: a server's HTML or JSON error reply saved under a tile name is not one."""
+    try:
+        with Image.open(path) as im:
+            im.verify()
         return True
-    cmd = ["curl", "-q", "-s", "-m", "60", "-o", str(path), url]
-    cmd += curl_args(proxy)
-    subprocess.run(cmd, check=False)
-    return path.exists() and path.stat().st_size > 1000
+    except Exception:  # noqa: BLE001 — any decode failure means "not a tile"
+        return False
+
+
+def _get(url: str, path: Path, proxy: str | None) -> bool:
+    """Cache one tile at path. Only a downloaded image is moved into place, so the cache never holds an error page."""
+    if path.exists():
+        if _is_tile(path):
+            return True
+        path.unlink()
+    tmp = temp_path(path)
+    try:
+        cmd = ["curl", "-q", "-s", "-f", "-m", "60", "-o", str(tmp), url]
+        cmd += curl_args(proxy)
+        ok = subprocess.run(cmd, check=False).returncode == 0 and tmp.exists() and _is_tile(tmp)
+        if ok:
+            os.replace(tmp, path)
+        return ok
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def fetch(center: tuple[float, float], zoom: int, radius: int, out: Path, source: str,

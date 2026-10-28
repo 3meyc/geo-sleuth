@@ -342,6 +342,8 @@ uv run skills/geo-sleuth/scripts/doctor.py --network
 
 For an installed skill, use its actual `scripts/doctor.py` path, or ask your agent to run it. The local check tests Python, uv, curl, bundled lookup tables, a writable working directory and an actual browser launch. `--network` also probes the services without uploading photos. `--json` produces machine-readable diagnostics. Exit code 1 means a failed check; warnings identify optional features that may not work. uv may fetch Playwright on the first run; doctor does not load OCR or ML models. Passing an endpoint probe does not guarantee image uploads, model downloads, imagery coverage or freedom from CAPTCHAs.
 
+`--network` probes every Overpass mirror `osm.py` would try. A mirror that is unreachable or never answers is skipped for the rest of a query after its first failure, and a whole query stops at 2 × (timeout + 30) + 60 seconds (480 s at the default timeout). To leave a mirror out, or to use your own Overpass instance, set `GEO_OVERPASS_ENDPOINTS` to comma-separated interpreter URLs, for example `GEO_OVERPASS_ENDPOINTS=https://overpass-api.de/api/interpreter`.
+
 To check the local processing pipeline on your own image before using online search:
 
 ```bash

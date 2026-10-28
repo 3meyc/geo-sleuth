@@ -42,8 +42,10 @@ Examples (江苏省 = Jiangsu Province, 长江 = Yangtze River):
 from __future__ import annotations
 
 import argparse
+from _files import write_atomic
 from _net import curl_args, PROXY_HELP
 import hashlib
+import itertools
 import json
 import math
 import os
@@ -71,12 +73,19 @@ CONNECT_TIMEOUT_S = 10
 UNREACHABLE = {"curl exit 6", "curl exit 7", "curl exit 28"}
 
 
+def endpoints() -> list[str]:
+    """Mirrors to try, in order: GEO_OVERPASS_ENDPOINTS (comma-separated interpreter URLs) replaces ENDPOINTS, e.g. to drop a
+    mirror that accepts connections but never answers, or to use a private Overpass instance."""
+    custom = [u.strip() for u in os.environ.get("GEO_OVERPASS_ENDPOINTS", "").split(",") if u.strip()]
+    return custom or ENDPOINTS
+
+
 AREA_SET = re.compile(r"(\((?:area\[[^;]*\];)+\))->\.(\w+);")
 
 
-def _post(ep: str, ql: str, proxy: str | None, timeout: int) -> tuple[dict | None, str]:
-    """(reply, "") or (None, "HTTP 504: <what the server said>")."""
-    cmd = ["curl", "-q", "-s", "--connect-timeout", str(CONNECT_TIMEOUT_S), "-m", str(timeout + 30), "-A", UA,
+def _post(ep: str, ql: str, proxy: str | None, timeout: int, *, max_time_s: float) -> tuple[dict | None, str]:
+    """(reply, "") or (None, "HTTP 504: <what the server said>"). The request is abandoned after max_time_s."""
+    cmd = ["curl", "-q", "-s", "--connect-timeout", str(CONNECT_TIMEOUT_S), "-m", str(max(1, int(max_time_s))), "-A", UA,
            "-w", "\n%{http_code}", "--data-urlencode", f"data={ql}", ep]
     cmd += curl_args(proxy)
     r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -117,11 +126,20 @@ def run(ql: str, proxy: str | None, cache: Path, timeout: int = 180, rounds: int
         print("Rechecking an old empty area cache against the mirrors", file=sys.stderr)
     errs: dict[str, str] = {}
     empty_from = None
+    request_s = timeout + 30
+    # Room for two full-length answers (an empty --area result needs a second mirror) plus the retry pauses
+    deadline_s = 2 * request_s + 60
+    deadline = time.monotonic() + deadline_s
+    out_of_time = False
     for rnd in range(rounds):
-        for ep in ENDPOINTS:
+        for ep in endpoints():
             if ep == empty_from or errs.get(ep) in UNREACHABLE:
                 continue
-            data, err = _post(ep, ql, proxy, timeout)
+            left = deadline - time.monotonic()
+            if left <= 0:
+                out_of_time = True
+                break
+            data, err = _post(ep, ql, proxy, timeout, max_time_s=min(request_s, left))
             if data is None:
                 errs[ep] = err
                 continue
@@ -137,18 +155,25 @@ def run(ql: str, proxy: str | None, cache: Path, timeout: int = 180, rounds: int
             stored = dict(data)
             if empty_from is not None and _area_empty(data, ql):
                 stored["_geo_empty_confirmed"] = True
-            key.write_text(json.dumps(stored), encoding="utf-8")
+            write_atomic(key, json.dumps(stored))
             return data
         if empty_from is not None:
             print(f"Only {empty_from} answered, with an empty --area result; not confirmed by a second mirror, so not cached. "
                   f"Rerun later, or use --bbox, before treating it as \"none\".", file=sys.stderr)
             return first_empty
         last = "; ".join(f"{ep.split('/')[2]} {e}" for ep, e in errs.items())
-        if rnd < rounds - 1:
-            print(f"No Overpass mirror returned a result, retrying in {15 * (rnd + 1)} s: {last}", file=sys.stderr)
-            time.sleep(15 * (rnd + 1))
-    sys.exit(f"Overpass query failed on every mirror ({last}). HTTP 504/\"too busy\": retry later, or use --bbox / a smaller area; "
-             f"HTTP 400: check the query syntax; curl exit: network or proxy (doctor.py --network)")
+        pause_s = 15 * (rnd + 1)
+        if out_of_time or rnd == rounds - 1:
+            break
+        if deadline - time.monotonic() <= pause_s:      # no time left for another round after the pause
+            out_of_time = True
+            break
+        print(f"No Overpass mirror returned a result, retrying in {pause_s} s: {last}", file=sys.stderr)
+        time.sleep(pause_s)
+    stopped = f"stopped at the {deadline_s} s deadline; " if out_of_time else ""
+    sys.exit(f"Overpass query failed on every mirror ({stopped}{last}). HTTP 504/\"too busy\": retry later, or use --bbox / a smaller "
+             f"area; HTTP 400: check the query syntax; curl exit: network or proxy (doctor.py --network); a mirror that never "
+             f"answers can be left out with GEO_OVERPASS_ENDPOINTS")
 
 
 def _area_sel(name: str, var: str, loose: bool = False) -> str:
@@ -571,23 +596,100 @@ def _match(el: dict, flt: str) -> bool:
     return True
 
 
+# Closed ways with these keys are areas unless area=no, following the common OSM polygon rules (osm-polygon-features):
+# a closed highway, barrier, railway or power line is still a line. Values listed are the linear exceptions of an area key.
+AREA_KEYS = {"building": (), "landuse": (), "amenity": (), "leisure": (), "place": (), "shop": (), "tourism": (),
+             "historic": (), "military": (), "office": (), "craft": (), "aeroway": ("taxiway", "runway"),
+             "natural": ("coastline", "cliff", "ridge", "arete", "tree_row"), "man_made": ("embankment", "pipeline", "cutline"),
+             "waterway": None, "boundary": None, "public_transport": None}
+AREA_VALUES = {"waterway": ("riverbank", "dock", "boatyard"), "public_transport": ("platform", "station")}
+
+
+def _is_area(tags: dict) -> bool:
+    area = tags.get("area")
+    if area in ("yes", "no"):
+        return area == "yes"
+    for key, linear in AREA_KEYS.items():
+        value = tags.get(key)
+        if value is None or value == "no":
+            continue
+        if linear is None:
+            if value in AREA_VALUES.get(key, ()):
+                return True
+        elif value not in linear:
+            return True
+    return False
+
+
+def _rings(paths: list[list[list[float]]]) -> list[list[list[float]]]:
+    """Join way segments that share end nodes into closed rings; segments that never close are dropped."""
+    open_paths = [list(p) for p in paths if len(p) >= 2]
+    rings = []
+    while open_paths:
+        ring = open_paths.pop(0)
+        while ring[0] != ring[-1]:
+            for k, p in enumerate(open_paths):
+                if p[0] == ring[-1]:
+                    ring += p[1:]
+                elif p[-1] == ring[-1]:
+                    ring += p[-2::-1]
+                else:
+                    continue
+                open_paths.pop(k)
+                break
+            else:
+                break
+        if ring[0] == ring[-1] and len(ring) >= 4:
+            rings.append(ring)
+    return rings
+
+
+def _inside(pt: list[float], ring: list[list[float]]) -> bool:
+    x, y = pt
+    hit = False
+    for (x1, y1), (x2, y2) in itertools.pairwise(ring):
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+            hit = not hit
+    return hit
+
+
+def element_feature(el: dict) -> dict | None:
+    """One Overpass element (out geom tags) as a GeoJSON Feature: node → Point; closed way with area tags → Polygon, other
+    way → LineString; multipolygon/boundary relation → MultiPolygon assembled from its member ways (each inner ring goes
+    with the outer ring that contains it). None for an element without usable geometry."""
+    tags = el.get("tags") or {}
+    if el["type"] == "node":
+        geom = {"type": "Point", "coordinates": [el["lon"], el["lat"]]}
+    elif el["type"] == "way" and el.get("geometry"):
+        coords = [[g["lon"], g["lat"]] for g in el["geometry"]]
+        closed = len(coords) > 3 and coords[0] == coords[-1]
+        geom = {"type": "Polygon", "coordinates": [coords]} if closed and _is_area(tags) \
+            else {"type": "LineString", "coordinates": coords}
+    elif el["type"] == "relation":
+        paths = {"outer": [], "inner": []}
+        for m in el.get("members") or []:
+            if m.get("type") == "way" and m.get("geometry") and m.get("role", "outer") in ("outer", "inner", ""):
+                paths[m.get("role") or "outer"].append([[g["lon"], g["lat"]] for g in m["geometry"]])
+        outers = _rings(paths["outer"])
+        if not outers:
+            return None
+        polys = [[ring] for ring in outers]
+        for inner in _rings(paths["inner"]):
+            for poly in polys:
+                if _inside(inner[0], poly[0]):
+                    poly.append(inner)
+                    break
+        geom = {"type": "MultiPolygon", "coordinates": polys}
+    else:
+        return None
+    return {"type": "Feature", "id": f"{el['type']}/{el['id']}", "properties": tags, "geometry": geom}
+
+
 def cmd_geom(args) -> dict:
     """Any filter → GeoJSON (keeps geometry for lines, polygons and points), for custom analysis or overlays."""
     pre, sc = _scope(args)
     data = run(f"[out:json][timeout:180];{pre}nwr{args.filter}{sc};out geom tags;", args.proxy, args.cache)
-    feats = []
-    for el in data.get("elements", []):
-        tags = el.get("tags") or {}
-        if el["type"] == "node":
-            geom = {"type": "Point", "coordinates": [el["lon"], el["lat"]]}
-        elif el.get("geometry"):
-            coords = [[g["lon"], g["lat"]] for g in el["geometry"]]
-            closed = len(coords) > 3 and coords[0] == coords[-1]
-            geom = {"type": "Polygon", "coordinates": [coords]} if closed and ("building" in tags or "area" in tags) \
-                else {"type": "LineString", "coordinates": coords}
-        else:
-            continue
-        feats.append({"type": "Feature", "id": f"{el['type']}/{el['id']}", "properties": tags, "geometry": geom})
+    feats = [ft for ft in map(element_feature, data.get("elements", [])) if ft is not None]
     gj = {"type": "FeatureCollection", "features": feats}
     out = args.out or Path("osm_geom.geojson")
     out.write_text(json.dumps(gj, ensure_ascii=False), encoding="utf-8")

@@ -51,6 +51,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+from _files import write_atomic
 from _net import PROXY_HELP
 import json
 import math
@@ -103,7 +104,7 @@ def _load(p: Path) -> dict:
 
 def _save(p: Path, b: dict) -> None:
     b["updated"] = datetime.now().isoformat(timespec="seconds")
-    p.write_text(json.dumps(b, ensure_ascii=False, indent=1), encoding="utf-8")
+    write_atomic(p, json.dumps(b, ensure_ascii=False, indent=1))
 
 
 def _find(b: dict, name: str) -> str:
