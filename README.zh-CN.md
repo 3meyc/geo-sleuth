@@ -267,7 +267,7 @@ flowchart LR
 |---|---|
 | EXIF：GPS、拍摄时间、等效焦距、朝向 | `exif.py` |
 | 整图、放大裁图和切块的 OCR（macOS 上用 Apple Vision，其他系统用 RapidOCR） | `ocr.py` |
-| 百度和 Yandex 以图搜图，相似图片拼成带编号的图片墙；关键词搜图 | `revimg.py` |
+| 百度以图搜图（本分支已移除 Yandex），相似图片拼成带编号的图片墙；关键词搜图 | `revimg.py` |
 | 一条命令完成第 0–3 步：元数据、边缘裁图、变体、OCR、以图搜图 → 生成 `intake.md` | `intake.py` |
 | 放大裁图、边缘和角落裁图、切块、提取桥墩等等间距结构的像素列 | `imgprep.py` |
 | 查表：全球的国际电话区号、靠左/靠右行驶、海外属地；地区包里的车牌前缀、固话区号、行政区划 | `clues.py` + `data/` + `regions/` |

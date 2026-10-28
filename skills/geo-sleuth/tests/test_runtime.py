@@ -127,10 +127,10 @@ class NetworkTests(unittest.TestCase):
                 return original([sys.executable, *cmd[2:]], **kwargs)
             with patch.object(intake, "_run", side_effect=local_or_search), patch.object(sys, "argv", ["intake.py", str(photo), "--out-dir", str(root / "out"), "--no-ocr", "--max-variants", "1", "--proxy", "direct"]):
                 intake.main()
-            self.assertEqual(len(commands), 2)
+            self.assertEqual(len(commands), 1)
             for cmd in commands:
                 self.assertEqual(cmd[cmd.index("--proxy") + 1], "direct")
-            self.assertEqual({cmd[cmd.index("--engines") + 1] for cmd in commands}, {"baidu", "yandex"})
+            self.assertEqual({cmd[cmd.index("--engines") + 1] for cmd in commands}, {"baidu"})
 
 
 class BrowserTests(unittest.IsolatedAsyncioTestCase):
@@ -165,10 +165,10 @@ class BrowserTests(unittest.IsolatedAsyncioTestCase):
         manager.__aenter__.return_value = object()
         # Avoid requiring Playwright in this offline test's environment.
         fake = SimpleNamespace(async_playwright=lambda: manager)
-        with tempfile.TemporaryDirectory() as folder, patch.dict(sys.modules, {"playwright.async_api": fake}), patch.object(revimg, "launch_browser", AsyncMock(return_value=(browser, "test"))) as launch, patch.object(revimg, "_text", AsyncMock(return_value={"links": []})), patch.object(revimg, "_baidu", AsyncMock(return_value={"links": []})) as baidu, patch.object(revimg, "_yandex", AsyncMock(return_value={"links": []})):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(sys.modules, {"playwright.async_api": fake}), patch.object(revimg, "launch_browser", AsyncMock(return_value=(browser, "test"))) as launch, patch.object(revimg, "_text", AsyncMock(return_value={"links": []})), patch.object(revimg, "_baidu", AsyncMock(return_value={"links": []})) as baidu:
             Image.new("RGB", (8, 8)).save(Path(folder) / "photo.jpg")
-            await revimg.run([Path(folder) / "photo.jpg"], ["baidu", "yandex"], Path(folder), "direct", ["school"], ["bing"])
-            self.assertEqual(launch.await_count, 3)
+            await revimg.run([Path(folder) / "photo.jpg"], ["baidu"], Path(folder), "direct", ["school"], ["bing"])
+            self.assertEqual(launch.await_count, 2)
             self.assertTrue(all(call.args[1] == "direct" for call in launch.await_args_list))
             self.assertEqual(baidu.await_args.args[-1], "direct")
 
@@ -1251,14 +1251,10 @@ class RevimgInputTests(unittest.TestCase):
         return raw, page
 
     def _search(self, call):
-        sent = {"baidu": [], "yandex": []}
+        sent = {"baidu": []}
 
         async def baidu(ctx, up, shot, *rest):
             sent["baidu"].append((Path(up), self._color_of(up)))
-            return {"guess": [], "links": []}
-
-        async def yandex(ctx, up, shot):
-            sent["yandex"].append((Path(up), self._color_of(up)))
             return {"guess": [], "links": []}
 
         browser = SimpleNamespace(new_context=AsyncMock(), close=AsyncMock())
@@ -1267,7 +1263,7 @@ class RevimgInputTests(unittest.TestCase):
         fake = SimpleNamespace(async_playwright=lambda: manager)
         with patch.dict(sys.modules, {"playwright.async_api": fake}), \
                 patch.object(revimg, "launch_browser", AsyncMock(return_value=(browser, "test"))) as launch, \
-                patch.object(revimg, "_baidu", new=baidu), patch.object(revimg, "_yandex", new=yandex):
+                patch.object(revimg, "_baidu", new=baidu):
             got = call()
         return got, sent, launch
 
@@ -1292,25 +1288,24 @@ class RevimgInputTests(unittest.TestCase):
                   self._solid("gray", self.d / "c" / "photo.jpg", quality=95): "gray"}         # needs no copy
         if _image.HEIF:
             images[self._solid("blue", self.d / "d" / "photo.heic", format="HEIF", quality=-1)] = "blue"
-        results, sent, _ = self._search(lambda: asyncio.run(revimg.run(list(images), ["baidu", "yandex"], self.out, "direct")))
+        results, sent, _ = self._search(lambda: asyncio.run(revimg.run(list(images), ["baidu"], self.out, "direct")))
         for eng, calls in sent.items():
             self.assertEqual([c for _, c in calls], list(images.values()), eng)
             self.assertEqual(len({p for p, _ in calls}), len(images), f"{eng}: two inputs shared one upload file")
         self.assertEqual(sent["baidu"][2][0], self.d / "c" / "photo.jpg")
         records = [json.loads(f.read_text(encoding="utf-8")) for f in sorted(self.out.glob("*.json"))]
-        self.assertEqual(len(records), 2 * len(images))
+        self.assertEqual(len(records), len(images))
         for r in results + records:                                 # each record names the original whose pixels went out
             self.assertEqual(self._color_of(r.get("uploaded", r["image"])), images[Path(r["image"])], r)
 
     def test_unreadable_inputs_are_reported_and_not_uploaded(self):
         raw, page = self._unreadable()
         good = self._solid("red", self.d / "good.webp", lossless=True)
-        results, sent, _ = self._search(lambda: asyncio.run(revimg.run([raw, page, good], ["baidu", "yandex"], self.out, "direct")))
+        results, sent, _ = self._search(lambda: asyncio.run(revimg.run([raw, page, good], ["baidu"], self.out, "direct")))
         for eng, calls in sent.items():
             self.assertEqual([c for _, c in calls], ["red"], eng)
         bad = {(Path(r["image"]).name, r["engine"]): r["unreadable"] for r in results if r.get("unreadable")}
-        self.assertEqual(bad, {("IMG_1.CR2", "baidu"): "raw", ("IMG_1.CR2", "yandex"): "raw",
-                               ("tile.jpg", "baidu"): "not-image", ("tile.jpg", "yandex"): "not-image"})
+        self.assertEqual(bad, {("IMG_1.CR2", "baidu"): "raw", ("tile.jpg", "baidu"): "not-image"})
         rec = json.loads((self.out / "IMG_1_baidu.json").read_text(encoding="utf-8"))
         self.assertIn("export it as JPEG or PNG", rec["error"])
         self.assertNotIn("screenshot", rec)
@@ -1326,14 +1321,22 @@ class RevimgInputTests(unittest.TestCase):
         self.assertIn(f"{page} (text, not an image", err)
         self.assertEqual([p for p, _ in sent["baidu"]], [good])
 
+    def test_cli_skips_removed_and_not_integrated_engines(self):
+        good = self._solid("red", self.d / "good.jpg")
+        (code, err), sent, _ = self._search(lambda: self._main(good, "--out-dir", self.out, "--engines", "baidu,yandex,google_lens,tineye"))
+        self.assertEqual(code, 0)
+        self.assertIn("unknown engine 'yandex'", err)
+        self.assertIn("google_lens is not integrated", err)
+        self.assertIn("tineye is not integrated", err)
+        self.assertEqual([p for p, _ in sent["baidu"]], [good])
+
     def test_cli_with_only_unreadable_inputs_starts_no_browser(self):
         raw, page = self._unreadable()
         (code, err), sent, launch = self._search(lambda: self._main(raw, page, "--out-dir", self.out))
         self.assertEqual(code, 2)
         self.assertEqual(launch.await_count, 0)
-        self.assertEqual(sent, {"baidu": [], "yandex": []})
-        self.assertEqual(sorted(f.name for f in self.out.iterdir()),
-                         ["IMG_1_baidu.json", "IMG_1_yandex.json", "tile_baidu.json", "tile_yandex.json"])
+        self.assertEqual(sent, {"baidu": []})
+        self.assertEqual(sorted(f.name for f in self.out.iterdir()), ["IMG_1_baidu.json", "tile_baidu.json"])
         r = subprocess.run([sys.executable, revimg.__file__, str(raw), "--out-dir", str(self.d / "rev2")],
                            capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 2, r.stderr)

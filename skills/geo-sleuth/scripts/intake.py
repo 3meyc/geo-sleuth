@@ -16,7 +16,7 @@ intake.md is for humans (and the LLM): metadata, OCR text, Baidu similar images 
 tiered vote count of image-search tags, suspected residential compound / housing development / hotel names, list of outputs, items skipped and failed.
 Always open the image-search screenshots and the similar-image contact sheets; "searched, nothing found" and "not searched" are written separately in the report.
 
-  intake.py photo.jpg --out-dir intake/ [--box x0,y0,x1,y1 ...] [--engines baidu,yandex] [--exclude word1,word2]
+  intake.py photo.jpg --out-dir intake/ [--box x0,y0,x1,y1 ...] [--engines baidu] [--exclude word1,word2]
             [--no-rev] [--no-ocr] [--max-variants 4]
 
 Examples:
@@ -98,7 +98,7 @@ def _collect_rev(rev_dir: Path) -> tuple[list[dict], dict]:
             d = json.loads(jf.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
             continue
-        m = re.match(r"(.+)_(baidu|yandex|bing|baiduimg|sogouimg)$", jf.stem)
+        m = re.match(r"(.+)_(baidu|bing|baiduimg|sogouimg)$", jf.stem)
         if not m:
             continue
         simi = d.get("similar") or []
@@ -133,7 +133,7 @@ def main() -> None:
     ap.add_argument("photo")
     ap.add_argument("--out-dir", type=Path, required=True)
     ap.add_argument("--box", action="append", help="x0,y0,x1,y1: tight-crop variant, repeatable")
-    ap.add_argument("--engines", default="baidu,yandex")
+    ap.add_argument("--engines", default="baidu")
     ap.add_argument("--exclude", help="words to exclude from reverse image search results (for blind tests)")
     ap.add_argument("--no-rev", action="store_true")
     ap.add_argument("--no-ocr", action="store_true")
@@ -202,7 +202,7 @@ def main() -> None:
         exif_json = {"raw": exif_res[1][:500]}
     (out / "exif.json").write_text(json.dumps(exif_json, ensure_ascii=False, indent=1), encoding="utf-8")
 
-    # Batch 2: reverse image search, two engines in parallel, each searches the original + up to max-variants variants
+    # Batch 2: reverse image search (Baidu only in this fork; engines run in parallel when several are given), each searches the original + up to max-variants variants
     rev_dir = out / "rev"
     entries, votes = [], {"city": {}, "place": {}}
     if not args.no_rev:

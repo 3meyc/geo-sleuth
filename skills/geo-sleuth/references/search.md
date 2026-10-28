@@ -8,13 +8,13 @@ Use at step 3, in parallel with lookup-table clues. In 5 of the 20 puzzles in th
 # Make variants first: tight crop of a distinctive object / horizontal flip / grayscale enhancement / color-cast removal; rectify rephotographed material first
 uv run scripts/imgprep.py variants photo.jpg --box 300,120,900,760 --out-dir v/
 uv run scripts/imgprep.py variants photo.jpg --persp 312,140,880,95,905,770,290,720 --box ... --out-dir v/
-# Baidu image search + Yandex; each image gets a result screenshot and JSON
+# Baidu image search (Yandex removed in this fork); each image gets a result screenshot and JSON
 uv run scripts/revimg.py photo.jpg v/*.jpg --out-dir rev/
 ```
 
 **Always open the result screenshots and look**: extracted text is only an aid; the scenes in similar images and the titles of source posts matter more. Baidu's similar images are also saved as a numbered contact sheet `<name>_baidu_similar.jpg` (the top-left cell is the query image; number i corresponds to the source page of JSON `similar[i]`). Look at it first: for near-duplicate photos of the same object or scene, the source page (Dianping, Douyin, Xiaohongshu) often gives the shop name or location tag directly.
 
-**How to use place-name labels**: Baidu image search's "图中可能是…" ("the image may show…"), Yandex labels and the Lens AI overview are all candidates; count votes separately by level:
+**How to use place-name labels**: Baidu image search's "图中可能是…" ("the image may show…") and the Lens AI overview are all candidates; count votes separately by level:
 - City level: count which city each crop and each engine named. The same city named by two different crops is more credible than "two contradictory specific places"; specific places that don't agree don't cancel the city they jointly point to.
 - Place level: when a label is the name of a residential compound, housing development, hotel or organization, get its coordinates with `poi.py` and check; this often gets you to the area in one step:
 
@@ -26,7 +26,7 @@ uv run scripts/tiles.py sheet --points pois.json --zoom 18 --out pois_sheet.jpg
 
 - When a label is the specific name of a common facility such as a school or residential compound, first open the "图片来源" ("image source") thumbnails to see whether it's the same place (one call): names on images of playgrounds or housing are mostly assembled by voting over similar images; if it isn't the same place, downgrade it to weak and don't bother getting coordinates.
 - **Facility-type words** in generic labels ("grain drying complex", "cement plant", "greenhouse") are useful: use them to look up where that industry is concentrated, for category inference and candidate areas.
-- When the label is generic ("blocks of housing", "city street", "school playground"), treat it only as weak evidence; if the whole image + one tight crop, one round in each of two engines, give only generic labels, stop; don't keep trying variants.
+- When the label is generic ("blocks of housing", "city street", "school playground"), treat it only as weak evidence; if the whole image + one tight crop, one round in each engine you have, give only generic labels, stop; don't keep trying variants.
 
 | Situation | What to do | Source |
 |---|---|---|
@@ -34,14 +34,18 @@ uv run scripts/tiles.py sheet --points pois.json --zoom 18 --out pois_sheet.jpg
 | Stock photos may have been taken from the other side | Flip horizontally and search again | v010-5 (hit only after flipping) |
 | Rephotographed material, oblique shots | Perspective-rectify, remove glare | v004 |
 | Old photos with a yellow or purple cast | Remove the color cast or convert to grayscale | v010-6 |
-| One engine has no results | Switch engines: Baidu is best for Chinese web pages, Weibo, Baijiahao and scenic-area content; Yandex fills in building and street scenes and foreign content | v009 (Yandex found nothing, Baidu hit) |
+| Baidu has no results | Baidu is best for Chinese web pages, Weibo, Baijiahao and scenic-area content; for buildings, street scenes and foreign content try Google Lens or TinEye in the user's browser | v009 |
 | The search UI language biases results | Google Lens with a Chinese UI favors similar buildings on Chinese sites; for foreign scenes switch to English or the local language | v004 |
 
-**Google Lens**: from the server's egress it demands a CAPTCHA, so the script doesn't do it. If you have a browser tool (such as Claude in Chrome, which uses the user's own browser), use it directly: Google Images home → search by image → upload. In tests it is often stronger than Baidu and Yandex, but keep its two result blocks apart:
+**Google Lens and TinEye** are not integrated in `revimg.py` (tested 2026-10-27: Lens ends on Google's CAPTCHA page, TinEye on a Cloudflare check; neither is bypassed). They could be integrated some day through an official or paid API.
+
+**Google Lens**: If you have a browser tool (such as Claude in Chrome, which uses the user's own browser), use it directly: Google Images home → search by image → upload. In tests it is often stronger than Baidu, but keep its two result blocks apart:
 - "Exact matches / pages that include this image": provenance evidence; usable.
 - "AI Overview": forces a place name out of similar-looking photos; a different crop of the same image can yield two places a dozen or so km apart. Treat it only as a candidate; it must be verified back at steps 6 and 7.
 
-Without a browser tool, when Baidu and Yandex both have no results and the frame shows a foreign landmark or object, ask the user to try Lens once in their own browser.
+**TinEye**: best for finding exact or edited copies of the same image and when it first appeared online; use it in the user's browser the same way (tineye.com → upload).
+
+Without a browser tool, when Baidu has no results and the frame shows a foreign landmark or object, ask the user to try Lens or TinEye once in their own browser.
 
 ### Keyword search in the local language
 

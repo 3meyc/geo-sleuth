@@ -5,15 +5,17 @@
 # ///
 """Reverse image search + Chinese keyword search: headless Chrome or Chromium opens the search engines, saves result screenshots, extracts guess text and links.
 
-  revimg.py <image> [<image> ...] --out-dir rev/ [--engines baidu,yandex]      reverse image search
+  revimg.py <image> [<image> ...] --out-dir rev/ [--engines baidu]             reverse image search
   revimg.py --query "<keywords>" [--query ...] --out-dir q/ [--text-engines bing,baiduimg,sogouimg]   keyword search
 
 Reverse image search:
 - baidu: the main engine for China. Best coverage of Chinese web pages, Weibo, Baijiahao, e-commerce and scenic-area content; gives a one-line "图中可能是…" ("the image may show…").
   The "相似图片" (similar images) cards are not links; they are captured from the pcsimi requests the page sends (it scrolls a few times to get more pages), deduplicated by contsign and written to `similar` in the JSON;
   the first --similar-sheet of them are downloaded into a numbered contact sheet `<name>_baidu_similar.jpg` (first cell is the query image): near-duplicate photos of the same object/scene are the fastest path to a location, always open it.
-- yandex: supplement for buildings, street scenes and foreign content; gives "Image appears to contain" tags and source sites.
-- Google Lens asks for human verification from a server egress, so the script doesn't do it; when you have a browser-control tool (e.g. Claude in Chrome), search in the user's own browser, see references/search.md.
+- Yandex was removed from this fork on purpose: photos are not sent to Yandex.
+- Google Lens and TinEye are not integrated (tested 2026-10-27, headless Chrome, see NOT_INTEGRATED below): Lens ends on Google's
+  "unusual traffic" CAPTCHA page after the upload, TinEye stops at a Cloudflare browser check. Neither is bypassed. When you have
+  a browser-control tool (e.g. Claude in Chrome), search in the user's own browser, see references/search.md.
 
 Keyword search (use when general web search tools often fail on Chinese domestic content):
 - bing: Bing China web results (title + link).
@@ -30,7 +32,6 @@ Run `uvx playwright install chromium` if neither is installed; `doctor.py` check
 Examples:
   revimg.py photo.jpg --out-dir rev/
   revimg.py v/left_crop.jpg v/left_flip.jpg --out-dir rev/ --engines baidu
-  revimg.py photo.jpg --out-dir rev/ --engines yandex
   revimg.py --query "蓝色拱形顶棚 人行天桥" --query "<city> 出租车 颜色" --out-dir q/   (queries in Chinese: blue arched canopy footbridge; <city> taxi color)
 """
 from __future__ import annotations
@@ -49,12 +50,20 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-OWN = {"baidu": ("baidu.com", "bdimg.com", "bdstatic.com"), "yandex": ("yandex.", "ya.ru", "yastatic.net"),
+OWN = {"baidu": ("baidu.com", "bdimg.com", "bdstatic.com"),
        "bing": ("bing.com", "bing.net", "microsoft.com"), "baiduimg": ("baidu.com", "bdimg.com", "bdstatic.com"),
        "sogouimg": ("sogou.com", "sogoucdn.com")}
 BAIDU_REFUSED = ("功能优化中", "建议您重新上传其他图片")
 TEXT_URL = {"bing": "https://cn.bing.com/search?q={q}", "baiduimg": "https://image.baidu.com/search/index?tn=baiduimage&word={q}",
             "sogouimg": "https://pic.sogou.com/pics?query={q}"}
+# Reverse image search engines that could be integrated some day. Both were probed on 2026-10-27 with the same headless
+# Chrome launch as the other engines and blocked by a bot check; they stay out until an official API or a flow without
+# a human-verification wall exists. Don't add CAPTCHA or Cloudflare workarounds.
+# - google_lens: google.com/imghp → file input → consent.google.com ("Reject all" works) → upload again → google.com/sorry CAPTCHA.
+#   Paid route: a SERP API that wraps Lens. Manual route: Lens in the user's own browser (references/search.md).
+# - tineye: tineye.com stays on Cloudflare's "Checking your browser" page; no file input appears. Paid route: the TinEye API
+#   (api.tineye.com, needs a key), which also takes an image upload and returns matching pages.
+NOT_INTEGRATED = {"google_lens": "google.com/sorry CAPTCHA after upload", "tineye": "Cloudflare browser check"}
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
 
 
@@ -71,10 +80,7 @@ async def _collect(page, engine: str) -> dict:
         seen.add(ln["h"])
         out.append({"title": ln["t"], "url": ln["h"], "site": host})
     lines = [s.strip() for s in text.splitlines() if s.strip()]
-    guess = [s for s in lines if s.startswith("图中可能是") or "appears to contain" in s.lower()]
-    if engine == "yandex" and guess:            # the tags are the few lines right after "appears to contain"
-        i = lines.index(guess[0])
-        guess = [guess[0] + ": " + " / ".join(lines[i + 1:i + 8])]
+    guess = [s for s in lines if s.startswith("图中可能是")]
     return {"url": page.url, "guess": guess, "links": out[:25], "text_head": "\n".join(lines[:60])[:2500]}
 
 
@@ -189,36 +195,7 @@ async def _baidu(ctx, img: Path, shot: Path, similar_pages: int = 2, sheet_n: in
         if ok < min(sheet_n, len(similar)):
             res["similar_sheet_note"] = f"{min(sheet_n, len(similar)) - ok} thumbnails failed to download"
     if not res["guess"] and any(w in res["text_head"] for w in BAIDU_REFUSED):
-        res["error"] = "Baidu refused to process this image (the \"功能优化中\" (\"under optimization\") page); this does not count as searched with no result: try another crop, retry later, or use only Yandex"
-    return res
-
-
-async def _yandex(ctx, img: Path, shot: Path) -> dict:
-    page = await ctx.new_page()
-    await page.goto("https://yandex.com/images/search?rpt=imageview", wait_until="domcontentloaded", timeout=60000)
-    await page.wait_for_timeout(2500)
-    inp = await page.query_selector("input[type=file]")
-    if not inp:
-        await page.screenshot(path=str(shot))
-        return {"error": "upload input not found (possibly asked for verification); check the screenshot"}
-    await inp.set_input_files(str(img))
-    for _ in range(60):
-        await page.wait_for_timeout(500)
-        if "url=" in page.url or "cbir_id" in page.url:
-            break
-    await page.wait_for_timeout(4500)
-    for label in ("Allow essential cookies", "Only essential", "Accept essential", "Allow all", "Accept all"):
-        try:                                            # the cookie popup covers the bottom right of the screenshot
-            btn = page.get_by_role("button", name=label)
-            if await btn.count():
-                await btn.first.click(timeout=2000)
-                await page.wait_for_timeout(800)
-                break
-        except Exception:  # noqa: BLE001
-            continue
-    await page.screenshot(path=str(shot), full_page=True, clip={"x": 0, "y": 0, "width": 1400, "height": 3200})
-    res = await _collect(page, "yandex")
-    await page.close()
+        res["error"] = "Baidu refused to process this image (the \"功能优化中\" (\"under optimization\") page); this does not count as searched with no result: try another crop or retry later"
     return res
 
 
@@ -315,13 +292,13 @@ async def run(images: list[Path], engines: list[str], out_dir: Path, proxy: str 
         for eng in engines if any(uploads) else []:
             b = await browser()
             ctx = await b.new_context(viewport={"width": 1400, "height": 1000},
-                                      locale="zh-CN" if eng == "baidu" else "en-US")
+                                      locale="zh-CN")
             for img, name, up in zip(images, names, uploads):
                 if up is None:
                     continue
                 shot = out_dir / f"{name}_{eng}.png"
                 try:
-                    res = await (_baidu(ctx, up, shot, similar_pages, sheet_n, proxy) if eng == "baidu" else _yandex(ctx, up, shot))
+                    res = await _baidu(ctx, up, shot, similar_pages, sheet_n, proxy)
                 except Exception as e:  # noqa: BLE001
                     res = {"error": str(e)[:300]}
                 res.update({"image": str(img), "engine": eng, "screenshot": str(shot)})
@@ -337,7 +314,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("images", nargs="*", type=Path)
     ap.add_argument("--out-dir", type=Path, required=True)
-    ap.add_argument("--engines", default="baidu,yandex", help="reverse image search engines")
+    ap.add_argument("--engines", default="baidu", help="reverse image search engines (only baidu; google_lens and tineye are not integrated, see NOT_INTEGRATED)")
     ap.add_argument("--query", action="append", help="keyword search, repeatable")
     ap.add_argument("--text-engines", default="bing,baiduimg,sogouimg", help="keyword search engines")
     ap.add_argument("--proxy", default=os.environ.get("GEO_PROXY"), help=PROXY_HELP)
@@ -351,7 +328,13 @@ def main() -> None:
     missing = [str(p) for p in args.images if not p.is_file()]
     if missing:
         ap.error("image not found: " + ", ".join(missing))
-    engines = [e for e in args.engines.split(",") if e in ("baidu", "yandex")]
+    asked = [e for e in args.engines.split(",") if e]
+    for e in asked:
+        if e in NOT_INTEGRATED:
+            print(f"revimg: {e} is not integrated ({NOT_INTEGRATED[e]}); skipped", file=sys.stderr)
+        elif e != "baidu":
+            print(f"revimg: unknown engine {e!r}; skipped", file=sys.stderr)
+    engines = [e for e in asked if e == "baidu"]
     text_engines = [e for e in args.text_engines.split(",") if e in TEXT_URL]
     results = asyncio.run(run(args.images, engines, args.out_dir, args.proxy, args.query, text_engines,
                               args.similar_pages, args.similar_sheet))

@@ -268,7 +268,7 @@ Twenty-odd scripts, one job each. The full table with data sources is in `skills
 | Environment checks, browser launch and optional network probes | `doctor.py` |
 | EXIF: GPS, capture time, equivalent focal length, heading | `exif.py` |
 | OCR on the whole image, zoomed crops and tiles (Apple Vision on macOS, RapidOCR elsewhere) | `ocr.py` |
-| Reverse image search on Baidu and Yandex, similar images tiled into a numbered sheet; keyword image search | `revimg.py` |
+| Reverse image search on Baidu (Yandex removed in this fork; Google Lens and TinEye not integrated, see `revimg.py`), similar images tiled into a numbered sheet; keyword image search | `revimg.py` |
 | Steps 0–3 in one command: metadata, edge crops, variants, OCR, reverse search → `intake.md` | `intake.py` |
 | Zoom crops, edge and corner crops, tiling, pixel columns of evenly spaced structures such as piers | `imgprep.py` |
 | Lookup tables: calling codes, driving side, dependent territories worldwide; plate prefixes, area codes and admin divisions from region packs | `clues.py` + `data/` + `regions/` |
